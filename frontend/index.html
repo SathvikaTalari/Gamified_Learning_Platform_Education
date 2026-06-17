@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VidyaQuest — STEM for Rural India</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/main.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+</head>
+<body>
+<div id="app">
+  <!-- AUTH SCREEN -->
+  <div id="auth-screen" class="screen active">
+    <div class="auth-bg">
+      <div class="floating-shapes">
+        <span class="shape s1">🔢</span><span class="shape s2">🔬</span>
+        <span class="shape s3">💻</span><span class="shape s4">⚙️</span>
+        <span class="shape s5">🌟</span><span class="shape s6">🧮</span>
+      </div>
+    </div>
+    <div class="auth-container">
+      <div class="logo-area">
+        <div class="logo-icon">🎓</div>
+        <h1 class="logo-text">VidyaQuest</h1>
+        <p class="logo-sub">STEM Learning for Every Student</p>
+        <p class="logo-sub-hi">हर छात्र के लिए STEM शिक्षा</p>
+      </div>
+      <div class="auth-tabs">
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login / लॉगिन</button>
+        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Register / रजिस्टर</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <div id="login-form" class="auth-form">
+        <div class="input-group">
+          <span class="input-icon">📧</span>
+          <input type="email" id="login-email" placeholder="Email / ईमेल" autocomplete="email">
+        </div>
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="login-password" placeholder="Password / पासवर्ड" autocomplete="current-password">
+        </div>
+        <button class="btn-primary" id="btn-login" onclick="handleLogin()">Login 🚀</button>
+        <p class="demo-hint">
+          Student: <strong>arjun@vidyaquest.com</strong> / <strong>Demo@123</strong><br>
+          Teacher: <strong>priya@vidyaquest.com</strong> / <strong>Teach@123</strong>
+        </p>
+      </div>
+
+      <!-- REGISTER FORM -->
+      <div id="register-form" class="auth-form hidden">
+        <!-- ROLE SELECTOR -->
+        <div class="role-selector" id="role-selector">
+          <div class="role-card selected" id="role-card-student" onclick="selectRole('student')">
+            <div class="role-card-icon">🧑‍🎓</div>
+            <div class="role-card-label">I'm a Student</div>
+            <div class="role-card-sub">छात्र / विद्यार्थी</div>
+            <div class="role-check" id="role-check-student">✓</div>
+          </div>
+          <div class="role-card" id="role-card-teacher" onclick="selectRole('teacher')">
+            <div class="role-card-icon">👩‍🏫</div>
+            <div class="role-card-label">I'm a Teacher</div>
+            <div class="role-card-sub">शिक्षक / शिक्षिका</div>
+            <div class="role-check" id="role-check-teacher">✓</div>
+          </div>
+        </div>
+
+        <!-- COMMON FIELDS -->
+        <div class="input-group">
+          <span class="input-icon">✏️</span>
+          <input type="text" id="reg-name" placeholder="Full Name / पूरा नाम" autocomplete="name">
+        </div>
+        <div class="input-group">
+          <span class="input-icon">📧</span>
+          <input type="email" id="reg-email" placeholder="Email / ईमेल" autocomplete="email">
+        </div>
+
+        <!-- PASSWORD WITH STRENGTH METER -->
+        <div class="input-group">
+          <span class="input-icon">🔒</span>
+          <input type="password" id="reg-password" placeholder="Password / पासवर्ड" autocomplete="new-password" oninput="updatePasswordMeter()">
+        </div>
+        <div id="password-strength-section" class="password-strength-section hidden">
+          <div class="strength-meter">
+            <div class="strength-meter-fill" id="strength-meter-fill"></div>
+          </div>
+          <div class="strength-label" id="strength-label"></div>
+          <div class="strength-checklist" id="strength-checklist">
+            <div class="check-item" id="check-length"><span class="check-icon">✗</span> At least 8 characters</div>
+            <div class="check-item" id="check-upper"><span class="check-icon">✗</span> Uppercase letter (A-Z)</div>
+            <div class="check-item" id="check-lower"><span class="check-icon">✗</span> Lowercase letter (a-z)</div>
+            <div class="check-item" id="check-number"><span class="check-icon">✗</span> Number (0-9)</div>
+            <div class="check-item" id="check-special"><span class="check-icon">✗</span> Special character (!@#$%^&*)</div>
+          </div>
+        </div>
+
+        <!-- STUDENT-SPECIFIC FIELDS -->
+        <div id="student-fields" class="role-fields">
+          <div class="input-group">
+            <span class="input-icon">📚</span>
+            <select id="reg-grade">
+              <option value="" disabled selected>Grade / कक्षा</option>
+              <option value="6">Grade 6</option><option value="7">Grade 7</option>
+              <option value="8">Grade 8</option><option value="9">Grade 9</option>
+              <option value="10">Grade 10</option><option value="11">Grade 11</option>
+              <option value="12">Grade 12</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <span class="input-icon">🏫</span>
+            <input type="text" id="reg-school" placeholder="School Name / विद्यालय का नाम">
+          </div>
+          <div class="input-group">
+            <span class="input-icon">🌐</span>
+            <select id="reg-language">
+              <option value="en">English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="mr">मराठी (Marathi)</option>
+              <option value="or">ଓଡ଼ିଆ (Odia)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- TEACHER-SPECIFIC FIELDS -->
+        <div id="teacher-fields" class="role-fields hidden">
+          <div class="input-group">
+            <span class="input-icon">🏛️</span>
+            <select id="reg-department">
+              <option value="" disabled selected>Department / विभाग</option>
+              <option value="Mathematics">Mathematics / गणित</option>
+              <option value="Science">Science / विज्ञान</option>
+              <option value="Technology">Technology / तकनीकी</option>
+              <option value="Engineering">Engineering / इंजीनियरिंग</option>
+              <option value="Computer Science">Computer Science / कंप्यूटर विज्ञान</option>
+              <option value="General Studies">General Studies / सामान्य अध्ययन</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <span class="input-icon">🎯</span>
+            <select id="reg-specialization">
+              <option value="" disabled selected>Subject Specialization / विशेषज्ञता</option>
+              <option value="Physics">Physics / भौतिकी</option>
+              <option value="Chemistry">Chemistry / रसायन</option>
+              <option value="Biology">Biology / जीवविज्ञान</option>
+              <option value="Algebra">Algebra / बीजगणित</option>
+              <option value="Geometry">Geometry / ज्यामिति</option>
+              <option value="Statistics">Statistics / सांख्यिकी</option>
+              <option value="Programming">Programming / प्रोग्रामिंग</option>
+              <option value="Electronics">Electronics / इलेक्ट्रॉनिक्स</option>
+              <option value="Environmental Science">Environmental Science / पर्यावरण</option>
+              <option value="Robotics">Robotics / रोबोटिक्स</option>
+              <option value="Other">Other / अन्य</option>
+            </select>
+          </div>
+          <div class="input-group">
+            <span class="input-icon">🌐</span>
+            <select id="reg-teacher-language">
+              <option value="en">English</option>
+              <option value="hi">हिंदी (Hindi)</option>
+              <option value="mr">मराठी (Marathi)</option>
+              <option value="or">ଓଡ଼ିଆ (Odia)</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="btn-primary" id="btn-register" onclick="handleRegister()">Join VidyaQuest 🌟</button>
+      </div>
+      <div id="auth-error" class="error-msg hidden"></div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div id="main-screen" class="screen hidden">
+    <!-- TOP NAV -->
+    <nav class="top-nav">
+      <div class="nav-logo">🎓 VidyaQuest</div>
+      <div class="nav-stats">
+        <div class="stat-pill role-pill" id="nav-role-pill">🧑‍🎓 Student</div>
+        <div class="stat-pill xp-pill">⚡ <span id="nav-xp">0</span> XP</div>
+        <div class="stat-pill level-pill">🏅 Level <span id="nav-level">1</span></div>
+        <div class="stat-pill streak-pill">🔥 <span id="nav-streak">0</span></div>
+      </div>
+      <div class="nav-right">
+        <select id="lang-switcher" onchange="switchLanguage(this.value)" class="lang-select">
+          <option value="en">EN</option>
+          <option value="hi">हि</option>
+          <option value="mr">म</option>
+          <option value="or">ଓଡ଼</option>
+        </select>
+        <button class="avatar-btn" onclick="showScreen('profile')">
+          <span id="nav-avatar">🧑‍🎓</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- BOTTOM NAV (Student) -->
+    <nav class="bottom-nav" id="student-nav">
+      <button class="nav-item active" onclick="showScreen('home')" data-screen="home">
+        <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('subjects')" data-screen="subjects">
+        <span class="nav-icon">📚</span><span class="nav-label">Learn</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('leaderboard')" data-screen="leaderboard">
+        <span class="nav-icon">🏆</span><span class="nav-label">Rank</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('badges')" data-screen="badges">
+        <span class="nav-icon">🎖️</span><span class="nav-label">Badges</span>
+      </button>
+      <button class="nav-item scan-nav-btn" onclick="showScanSolve()" data-screen="scan-solve">
+        <span class="nav-icon">📷</span><span class="nav-label">Scan</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('profile')" data-screen="profile">
+        <span class="nav-icon">👤</span><span class="nav-label">Me</span>
+      </button>
+    </nav>
+
+    <!-- BOTTOM NAV (Teacher) -->
+    <nav class="bottom-nav hidden" id="teacher-nav">
+      <button class="nav-item active" onclick="showScreen('teacher-home')" data-screen="teacher-home">
+        <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('create-lesson')" data-screen="create-lesson">
+        <span class="nav-icon">✏️</span><span class="nav-label">Create</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('my-content')" data-screen="my-content">
+        <span class="nav-icon">📋</span><span class="nav-label">My Content</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('profile')" data-screen="profile">
+        <span class="nav-icon">👤</span><span class="nav-label">Me</span>
+      </button>
+    </nav>
+
+    <!-- SCREENS CONTAINER -->
+    <div class="screens-wrap">
+
+      <!-- TEACHER DASHBOARD -->
+      <div id="screen-teacher-home" class="inner-screen">
+        <div class="teacher-dash-header">
+          <div>
+            <h2 class="screen-title" id="teacher-greeting">Good Morning, Teacher! 👩‍🏫</h2>
+            <p class="screen-subtitle" id="teacher-subtitle">Here's how your students are doing today</p>
+          </div>
+        </div>
+
+        <!-- Top Stat Cards -->
+        <div class="teacher-stat-row">
+          <div class="teacher-stat-card" style="border-color:var(--purple)">
+            <div class="tsc-icon">👥</div>
+            <div class="tsc-val" id="t-total-students">–</div>
+            <div class="tsc-label">Students Enrolled</div>
+          </div>
+          <div class="teacher-stat-card" style="border-color:var(--secondary)">
+            <div class="tsc-icon">📈</div>
+            <div class="tsc-val" id="t-avg-score">–</div>
+            <div class="tsc-label">Class Avg Score</div>
+          </div>
+          <div class="teacher-stat-card" style="border-color:#FF6B6B">
+            <div class="tsc-icon">⚠️</div>
+            <div class="tsc-val" id="t-at-risk-count">–</div>
+            <div class="tsc-label">At-Risk Students</div>
+          </div>
+          <div class="teacher-stat-card" style="border-color:var(--accent)">
+            <div class="tsc-icon">📝</div>
+            <div class="tsc-val" id="t-my-lessons">–</div>
+            <div class="tsc-label">My Lessons</div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dash-col">
+            <!-- Subject Engagement -->
+            <div class="dash-card">
+              <h3 class="dash-title">📚 Subject Engagement</h3>
+              <div id="t-subject-stats" class="dash-list"></div>
+            </div>
+            <!-- Most Attempted -->
+            <div class="dash-card">
+              <h3 class="dash-title">🔥 Most Attempted Topics</h3>
+              <div id="t-most-attempted" class="dash-list"></div>
+            </div>
+            <!-- Least Attempted -->
+            <div class="dash-card">
+              <h3 class="dash-title">😴 Least Attempted Topics</h3>
+              <div id="t-least-attempted" class="dash-list"></div>
+            </div>
+          </div>
+          <div class="dash-col">
+            <!-- At-Risk Alert -->
+            <div class="dash-card at-risk-card">
+              <h3 class="dash-title" style="color:#FF6B6B">🚨 At-Risk Students <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)">(no activity in 7 days)</span></h3>
+              <div id="t-at-risk" class="dash-list"></div>
+            </div>
+            <!-- Recent Submissions -->
+            <div class="dash-card">
+              <h3 class="dash-title">📥 Recent Quiz Submissions</h3>
+              <div id="t-recent-submissions" class="dash-list"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CREATE LESSON SCREEN -->
+      <div id="screen-create-lesson" class="inner-screen">
+        <h2 class="screen-title">✏️ Create New Lesson</h2>
+        <p class="screen-subtitle">Add content and quiz questions for students</p>
+        <div class="create-form-wrap">
+          <!-- Step 1: Lesson Info -->
+          <div class="dash-card">
+            <h3 class="dash-title">📋 Lesson Details</h3>
+            <div class="form-grid">
+              <div class="form-group">
+                <label class="form-label">Subject *</label>
+                <select id="cl-subject" class="form-control">
+                  <option value="">Select subject...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Grade Level</label>
+                <select id="cl-grade" class="form-control">
+                  <option value="6">Grade 6</option><option value="7">Grade 7</option>
+                  <option value="8">Grade 8</option><option value="9">Grade 9</option>
+                  <option value="10">Grade 10</option>
+                </select>
+              </div>
+              <div class="form-group span-2">
+                <label class="form-label">Lesson Title *</label>
+                <input id="cl-title" type="text" class="form-control" placeholder="e.g. Quadratic Equations">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Difficulty</label>
+                <select id="cl-difficulty" class="form-control">
+                  <option value="easy">Easy</option>
+                  <option value="medium" selected>Medium</option>
+                  <option value="hard">Hard</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">XP Reward</label>
+                <input id="cl-xp" type="number" class="form-control" value="100" min="50" max="500">
+              </div>
+            </div>
+          </div>
+
+          <!-- Step 2: Content -->
+          <div class="dash-card">
+            <h3 class="dash-title">📖 Lesson Content</h3>
+            <div class="form-group">
+              <label class="form-label">Introduction *</label>
+              <textarea id="cl-intro" class="form-control form-textarea" placeholder="Write an engaging introduction for students..."></textarea>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label">Key Concepts <span style="color:var(--text3);font-size:0.75rem">(one per line)</span></label>
+              <textarea id="cl-concepts" class="form-control form-textarea" placeholder="e.g.\nVariables hold unknown values\nSolve by isolating the variable"></textarea>
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label">Example</label>
+              <input id="cl-example" type="text" class="form-control" placeholder="e.g. If x² = 9, then x = 3 or x = -3">
+            </div>
+            <div class="form-group" style="margin-top:12px">
+              <label class="form-label">Fun Fact</label>
+              <input id="cl-funfact" type="text" class="form-control" placeholder="An interesting fact related to the topic...">
+            </div>
+          </div>
+
+          <!-- Step 3: Quiz Questions -->
+          <div class="dash-card">
+            <h3 class="dash-title" style="justify-content:space-between;display:flex;align-items:center">
+              🎯 Quiz Questions
+              <button class="btn-add-q" onclick="addQuestionField()">+ Add Question</button>
+            </h3>
+            <div id="questions-container"></div>
+          </div>
+
+          <div id="create-lesson-error" class="error-msg hidden"></div>
+          <button class="btn-primary" onclick="handleCreateLesson()">🚀 Publish Lesson</button>
+          <div style="height:8px"></div>
+        </div>
+      </div>
+
+      <!-- MY CONTENT SCREEN -->
+      <div id="screen-my-content" class="inner-screen">
+        <h2 class="screen-title">📋 My Created Content</h2>
+        <p class="screen-subtitle">Lessons you've added for students</p>
+        <div id="my-content-list" class="dash-list" style="max-width:800px;margin:0 auto"></div>
+      </div>
+
+      <div id="screen-home" class="inner-screen active">
+        <!-- Dashboard Header -->
+        <div class="home-header">
+          <div class="greeting-box">
+            <h2 id="home-greeting">Good Morning! 🌅</h2>
+            <p id="home-username">Welcome back, Arjun!</p>
+          </div>
+          <div class="daily-streak-box">
+            <div class="streak-fire">🔥</div>
+            <div class="streak-count"><span id="home-streak">0</span></div>
+            <div class="streak-label">Day Streak</div>
+          </div>
+        </div>
+
+        <!-- Level & XP Bar -->
+        <div class="xp-bar-section">
+          <div class="xp-bar-label">
+            <span>Level <span id="home-level">1</span></span>
+            <span><span id="home-xp">0</span> / <span id="home-xp-next">200</span> XP</span>
+          </div>
+          <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar"></div></div>
+        </div>
+
+        <!-- Dashboard Grid Layout -->
+        <div class="dashboard-grid">
+          <!-- Left Column -->
+          <div class="dash-col">
+            <div class="dash-card">
+              <h3 class="dash-title">📊 Weekly XP Progress</h3>
+              <div class="chart-container">
+                <canvas id="weeklyXpChart"></canvas>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <h3 class="dash-title">📖 Continue Learning</h3>
+              <div id="home-subjects" class="subjects-grid-home"></div>
+            </div>
+
+            <div class="dash-card">
+              <h3 class="dash-title">🌟 Did You Know?</h3>
+              <div id="fun-fact-card" class="fun-fact-card">
+                <div class="fun-fact-icon">💡</div>
+                <div id="fun-fact-text" class="fun-fact-text">Loading...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column -->
+          <div class="dash-col">
+            <div class="dash-card">
+              <h3 class="dash-title">📅 Upcoming Tasks</h3>
+              <div id="dash-upcoming-tasks" class="dash-list">
+                <div class="empty-state">Loading tasks...</div>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <h3 class="dash-title">🕒 Recent Activity</h3>
+              <div id="dash-recent-activity" class="dash-list">
+                 <div class="empty-state">Loading activity...</div>
+              </div>
+            </div>
+
+            <div class="dash-card">
+              <h3 class="dash-title">🎖️ Badges Showcase</h3>
+              <div id="dash-badges" class="dash-badges-grid">
+                 <div class="empty-state">Loading badges...</div>
+              </div>
+              <button class="btn-text-small" onclick="showScreen('badges')">View All Badges →</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBJECTS -->
+      <div id="screen-subjects" class="inner-screen">
+        <h2 class="screen-title">Choose Subject</h2>
+        <p class="screen-subtitle" id="subjects-subtitle">Select a subject to start learning</p>
+        <div id="subjects-grid" class="subjects-grid"></div>
+      </div>
+
+      <!-- LESSONS LIST -->
+      <div id="screen-lessons" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('subjects')">← Back</button>
+        <div id="lessons-header" class="lessons-header"></div>
+        <div id="lessons-list" class="lessons-list"></div>
+      </div>
+
+      <!-- LESSON DETAIL -->
+      <div id="screen-lesson" class="inner-screen">
+        <button class="back-btn" id="lesson-back-btn" onclick="goBackFromLesson()">← Back</button>
+        <div id="lesson-content"></div>
+      </div>
+
+      <!-- QUIZ -->
+      <div id="screen-quiz" class="inner-screen">
+        <div id="quiz-container"></div>
+      </div>
+
+      <!-- LEADERBOARD -->
+      <div id="screen-leaderboard" class="inner-screen">
+        <h2 class="screen-title">🏆 Leaderboard</h2>
+        <p class="screen-subtitle">Top students this month</p>
+        <div id="leaderboard-list" class="leaderboard-list"></div>
+      </div>
+
+      <!-- BADGES -->
+      <div id="screen-badges" class="inner-screen">
+        <h2 class="screen-title">🎖️ My Badges</h2>
+        <p class="screen-subtitle">Earn badges by completing challenges!</p>
+        <div id="badges-grid" class="badges-grid"></div>
+      </div>
+
+      <!-- PROFILE -->
+      <div id="screen-profile" class="inner-screen">
+        <div id="profile-content"></div>
+      </div>
+
+    </div><!-- end screens-wrap -->
+  </div><!-- end main-screen -->
+
+  <!-- SCAN & SOLVE OVERLAY -->
+  <div id="scan-solve-overlay" class="scan-overlay hidden">
+    <div class="scan-panel">
+      <!-- Header -->
+      <div class="scan-header">
+        <button class="scan-close-btn" onclick="closeScanSolve()">✕</button>
+        <div class="scan-title-wrap">
+          <div class="scan-icon-pulse">📷</div>
+          <div>
+            <h2 class="scan-title">Scan &amp; Solve</h2>
+            <p class="scan-subtitle" id="scan-subtitle">Point camera at any STEM problem</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Camera / Image Area -->
+      <div class="scan-camera-section">
+        <div class="scan-viewfinder" id="scan-viewfinder">
+          <!-- Live preview -->
+          <video id="scan-video" class="scan-video" autoplay playsinline muted></video>
+          <!-- Captured image -->
+          <img id="scan-preview" class="scan-preview hidden" alt="Captured problem"/>
+          <!-- Corner brackets -->
+          <div class="vf-corner tl"></div>
+          <div class="vf-corner tr"></div>
+          <div class="vf-corner bl"></div>
+          <div class="vf-corner br"></div>
+          <!-- Scanning animation -->
+          <div class="scan-line" id="scan-line"></div>
+          <!-- Idle placeholder -->
+          <div class="scan-placeholder" id="scan-placeholder">
+            <div class="scan-ph-icon">📖</div>
+            <p>No camera yet — tap below to start</p>
+          </div>
+        </div>
+
+        <canvas id="scan-canvas" class="hidden"></canvas>
+
+        <!-- Camera Controls -->
+        <div class="scan-controls">
+          <button class="scan-btn-secondary" id="btn-upload-img" onclick="triggerImageUpload()" title="Upload from gallery">
+            🖼️ Gallery
+          </button>
+          <button class="scan-btn-capture" id="btn-capture" onclick="capturePhoto()" disabled>
+            📸 Capture
+          </button>
+          <button class="scan-btn-secondary" id="btn-camera-toggle" onclick="startCamera()" title="Start camera">
+            📷 Camera
+          </button>
+        </div>
+        <input type="file" id="scan-file-input" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="scan-actions" id="scan-actions" style="display:none">
+        <button class="scan-btn-retake" onclick="retakePhoto()">🔄 Retake</button>
+        <button class="scan-btn-solve" id="btn-solve" onclick="submitScanSolve()">
+          <span id="btn-solve-text">🔍 Solve This!</span>
+        </button>
+      </div>
+
+      <!-- Solution Output -->
+      <div class="scan-solution" id="scan-solution" style="display:none">
+        <div class="solution-header">
+          <span class="solution-badge">🤖 AI Solution</span>
+          <button class="solution-speak-btn" onclick="speakSolution()" id="btn-speak-solution">🔊 Read Aloud</button>
+        </div>
+        <div class="solution-body" id="solution-body"></div>
+      </div>
+
+      <!-- Tips -->
+      <div class="scan-tips" id="scan-tips">
+        <div class="tip-item">📸 Good lighting = better results</div>
+        <div class="tip-item">🔍 Hold phone steady &amp; close</div>
+        <div class="tip-item">📖 Works with textbooks &amp; handwriting</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- end app -->
+
+<!-- MODALS -->
+<div id="badge-modal" class="modal hidden">
+  <div class="modal-box badge-earned-box">
+    <div class="badge-earned-icon" id="badge-modal-icon">🏆</div>
+    <h3>Badge Earned!</h3>
+    <h2 id="badge-modal-name">Scholar</h2>
+    <p id="badge-modal-desc">You reached 500 XP!</p>
+    <button class="btn-primary" onclick="closeBadgeModal()">Awesome! 🎉</button>
+  </div>
+</div>
+
+<!-- AI TUTOR CHAT WIDGET -->
+<button id="ai-tutor-fab" class="ai-fab hidden" onclick="toggleChat()">
+  🤖 <span class="ai-fab-text">Ask AI Tutor</span>
+</button>
+
+<div id="ai-chat-window" class="chat-window hidden">
+  <div class="chat-header">
+    <div class="chat-title">
+      🤖 <span id="chat-header-text">VidyaQuest AI Tutor</span>
+    </div>
+    <button class="btn-close-chat" onclick="toggleChat()">✕</button>
+  </div>
+  <div class="chat-messages" id="chat-messages">
+    <div class="chat-message ai-message">
+      Hi! I am your AI STEM Tutor. How can I help you today?
+    </div>
+  </div>
+  <div class="chat-input-area">
+    <button id="chat-mic-btn" class="chat-mic-btn" onclick="startChatSpeechRecognition()" title="Speak your doubt">🎤</button>
+    <input type="text" id="chat-input" class="chat-input" placeholder="Type or speak doubt..." onkeypress="handleChatKeypress(event)">
+    <button class="btn-send-chat" onclick="sendChatMessage()">➤</button>
+  </div>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
