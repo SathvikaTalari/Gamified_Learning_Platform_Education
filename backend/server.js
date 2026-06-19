@@ -5,11 +5,54 @@ const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const http = require('http');
+const https = require('https');
+const fs = require('fs');
+const socketIo = require('socket.io');
 
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HTTPS_PORT = process.env.HTTPS_PORT || 3443;
 const JWT_SECRET = 'stem_rural_secret_2024';
+
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
+// Load optional SSL Certificates for secure HTTPS contexts (for camera support on LAN)
+let httpsServer = null;
+const sslPaths = {
+  key: path.join(__dirname, '../key.pem'),
+  cert: path.join(__dirname, '../cert.pem')
+};
+
+// Fallback search in backend folder
+if (!fs.existsSync(sslPaths.key) || !fs.existsSync(sslPaths.cert)) {
+  sslPaths.key = path.join(__dirname, 'key.pem');
+  sslPaths.cert = path.join(__dirname, 'cert.pem');
+}
+
+if (fs.existsSync(sslPaths.key) && fs.existsSync(sslPaths.cert)) {
+  try {
+    const options = {
+      key: fs.readFileSync(sslPaths.key),
+      cert: fs.readFileSync(sslPaths.cert)
+    };
+    httpsServer = https.createServer(options, app);
+    io.attach(httpsServer);
+    console.log('[HTTPS] SSL certificates loaded. HTTPS support enabled.');
+  } catch (err) {
+    console.error('⚠️ Failed to initialize HTTPS server:', err.message);
+  }
+} else {
+  console.log('[HTTPS] No key.pem/cert.pem found in project root. Running in HTTP mode only.');
+  console.log('[HTTPS] To enable HTTPS (needed for camera access over LAN), generate certificates and place them in the project root.');
+}
 
 app.use(cors());
 app.use(express.json());
@@ -793,6 +836,712 @@ Rules:
   }
 });
 
+// ===== EMOTION & ENGAGEMENT TRACKER API =====
+app.post('/api/emotion/analyze', auth, async (req, res) => {
+  const { imageBase64 } = req.body;
+
+  if (!imageBase64) {
+    return res.status(400).json({ error: 'No image data provided' });
+  }
+
+  // Mock fallback: cycles through realistic emotions for testing without Groq key
+  function getMockEmotion() {
+    const states = [
+      { emotion: 'focused', engagement: 'high', explanation: 'Student appears attentive and engaged with the content.' },
+      { emotion: 'confused', engagement: 'medium', explanation: 'Student shows signs of puzzlement — furrowed brow detected.' },
+      { emotion: 'bored', engagement: 'low', explanation: 'Student appears disengaged. Gaze averted from screen.' },
+      { emotion: 'happy', engagement: 'high', explanation: 'Student appears cheerful and motivated.' },
+      { emotion: 'frustrated', engagement: 'low', explanation: 'Student shows signs of stress or difficulty.' },
+      { emotion: 'distracted', engagement: 'low', explanation: 'Student attention appears to have wandered.' },
+    ];
+    return states[Math.floor(Date.now() / 15000) % states.length];
+  }
+
+  if (!process.env.GROQ_API_KEY) {
+    console.log('[EmotionTracker] No GROQ_API_KEY, returning mock emotion');
+    return res.json(getMockEmotion());
+  }
+
+  try {
+    // Strip data URL prefix if present
+    const base64Data = imageBase64.replace(/^data:image\/\w+;base64,/, '');
+    const dataUrl = `data:image/jpeg;base64,${base64Data}`;
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY.trim()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a specialized educational AI analyzing a student\'s facial expression during learning. Classify their current state. Return ONLY valid JSON, no markdown, no explanation outside the JSON object.'
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: 'Analyze this student\'s facial expression and classify their learning state. Return exactly this JSON structure (choose ONE option for each): { "emotion": "focused" | "confused" | "frustrated" | "bored" | "distracted" | "happy", "engagement": "high" | "medium" | "low", "explanation": "<one sentence about what you observe>" }'
+              },
+              {
+                type: 'image_url',
+                image_url: { url: dataUrl }
+              }
+            ]
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 200,
+      }),
+    });
+
+    if (!response.ok) {
+      console.warn('[EmotionTracker] Groq API error:', response.status, '— using mock');
+      return res.json(getMockEmotion());
+    }
+
+    const data = await response.json();
+    const rawText = data.choices[0].message.content.trim();
+
+    // Parse JSON from response (strip any markdown fences)
+    const cleaned = rawText.replace(/^```json/, '').replace(/```$/, '').trim();
+    const parsed = JSON.parse(cleaned);
+
+    // Validate required fields
+    const validEmotions = ['focused', 'confused', 'frustrated', 'bored', 'distracted', 'happy'];
+    const validEngagement = ['high', 'medium', 'low'];
+    if (!validEmotions.includes(parsed.emotion) || !validEngagement.includes(parsed.engagement)) {
+      return res.json(getMockEmotion());
+    }
+
+    res.json(parsed);
+  } catch (err) {
+    console.error('[EmotionTracker] Error:', err.message);
+    // Always return a valid response, never crash
+    res.json(getMockEmotion());
+  }
+});
+
+// ===== OFFLINE DOWNLOAD API WITH ADAPTIVE AI HINTS =====
+function generateFallbackHints(lesson, progress) {
+  const subjectCode = lesson.subject_code || 'math';
+  
+  // Extract concepts from lesson content
+  let concepts = [];
+  try {
+    const content = JSON.parse(lesson.content || '{}');
+    if (Array.isArray(content.concepts)) {
+      concepts = content.concepts;
+    }
+  } catch(e) {}
+
+  const hints = [];
+  
+  // Customization based on progress
+  let performanceAdjective = "!";
+  if (progress) {
+    if (progress.score < 5) performanceAdjective = " - keep it simple!";
+    else if (progress.score === 10) performanceAdjective = " - stretch challenge!";
+  }
+
+  // 1. Generate hints from lesson concepts (make multiple variations)
+  const prefixes = [
+    { en: "Concept Tip: ", hi: "संकल्पना युक्ति: ", mr: "संकल्पना टिप: ", or: "ଧାରଣା ଟିପ୍ସ: " },
+    { en: "Key Remember: ", hi: "मुख्य याद रखने योग्य: ", mr: "महत्त्वाचे लक्षात ठेवा: ", or: "ମୁଖ୍ୟ ମନେରଖିବା: " },
+    { en: "Did you know? ", hi: "क्या आप जानते हैं? ", mr: "तुम्हाला माहित आहे का? ", or: "ଆପڻ ଜାଣନ୍ତି କି? " },
+    { en: "Quick Tip: ", hi: "त्वरित युक्ति: ", mr: "द्रुत टीप: ", or: "ଶୀଘ୍ର ଟିପ୍ସ: " }
+  ];
+
+  concepts.forEach((concept, cIdx) => {
+    prefixes.forEach((pref, pIdx) => {
+      hints.push({
+        tag: `concept-${cIdx}`,
+        hint_en: `${pref.en}${concept}${performanceAdjective}`,
+        hint_hi: `${pref.hi}${concept}`,
+        hint_mr: `${pref.mr}${concept}`,
+        hint_or: `${pref.or}${concept}`
+      });
+    });
+  });
+
+  // 2. Fetch subject fallback templates
+  const subjectTemplates = {
+    math: [
+      { tag: "numbers", en: "Remember, variables are like boxes! Solve step-by-step by keeping both sides balanced.", hi: "याद रखें, वेरिएबल बक्से की तरह हैं! दोनों पक्षों को संतुलित रखकर चरण-दर-चरण हल करें।", mr: "लक्षात ठेवा, व्हेरिएबल्स बॉक्ससारखे असतात! दोन्ही बाजू संतुलित ठेवून स्टेप-बाय-स्टेप सोडवा.", or: "ମନେରଖନ୍ତୁ, ଭେରିଏବଲ୍ ଗୁଡ଼ିକ ବାକ୍ସ ପରି! ଦୁଇ ପାର୍ଶ୍ୱକୁ ସନ୍ତୁଳିତ ରଖି ପର୍ଯ୍ୟାୟକ୍ରମେ ସମାଧାନ କରନ୍ତୁ।" },
+      { tag: "fraction", en: "Fractions represent parts of a whole. Simplify the numerator and denominator first.", hi: "भिन्न एक संपूर्ण के भागों का प्रतिनिधित्व करते हैं। पहले अंश और हर को सरल बनाएं।", mr: "अपूर्णांक पूर्ण भागाचे प्रतिनिधित्व करतात. प्रथम अंश आणि छेद सोपे करा.", or: "ଭଗ୍ନାଂଶଗୁଡ଼ିକ ସମଗ୍ର ଭାଗର ପ୍ରତିନିଧିତ୍ଵ କରନ୍ତି। ପ୍ରଥମେ ହର ଏବଂ ଲବକୁ ସରଳ କରନ୍ତୁ।" },
+      { tag: "equation", en: "For equations, do the inverse operation. If it's addition, subtract from both sides!", hi: "समीकरणों के लिए, उल्टा ऑपरेशन करें। यदि यह जोड़ है, तो दोनों पक्षों से घटाएं!", mr: "समीकरणांसाठी, उलट क्रिया करा. बेरीज असल्यास, दोन्ही बाजूंनी वजा करा!", or: "ସମୀକରଣ ପାଇଁ, ଓଲଟା କାର୍ଯ୍ୟ କରନ୍ତୁ। ଯଦિ ଏହା ଯୋଗ, ତେବे ଉଭୟ ପାର୍ଶ୍ୱରୁ ବିୟୋଗ କରନ୍ତୁ!" },
+      { tag: "geometry", en: "A triangle's interior angles always sum up to exactly 180 degrees.", hi: "त्रिभुज के आंतरिक कोणों का योग हमेशा 180 डिग्री होता है।", mr: "त्रिकोणाच्या आतील कोनांची बेरीज नेहमी बरोबर १८० अंश असते.", or: "ଏକ ତ୍ରିଭୁଜର ଆଭ୍ୟନ୍ତରୀଣ କୋଣର ସମଷ୍ଟି ସର୍ବଦା ୧୮୦ ଡିଗ୍ରୀ ହୋଇଥାଏ।" },
+      { tag: "mean", en: "To find the mean, sum all values and divide by the total count.", hi: "माध्य ज्ञात करने के लिए, सभी मानों को जोड़ें और कुल संख्या से विभाजित करें।", mr: "सरासरी शोधण्यासाठी, सर्व मूल्यांची बेरीज करा आणि एकूण संख्येने भागा.", or: "ମାଧ୍ୟମାନ ଖୋଜିବା ପାଇଁ, ସମସ୍ତ ମୂଲ୍ୟର ସମଷ୍ଟି କରନ୍ତୁ ଏବଂ ମୋଟ୍ ସଂଖ୍ୟା ଦ୍ଵାରା ଭାଗ କରନ୍ତୁ।" }
+    ],
+    science: [
+      { tag: "force", en: "Force equals mass times acceleration (F=ma). Higher mass requires more force to accelerate.", hi: "बल द्रव्यमान गुणा त्वरण (F=ma) के बराबर होता है। भारी वस्तुओं को गति देने के लिए अधिक बल चाहिए।", mr: "बल म्हणजे वस्तुमान गुणिले प्रवेग (F=ma). जड वस्तूंना गती देण्यासाठी जास्त बल लागते.", or: "ବଳ ହେଉଛି ବସ୍ତୁତ୍ଵ ଗୁଣନ ତ୍ଵରଣ (F=ma)। ଅଧିକ ବସ୍ତୁତ୍ଵ ତ୍ଵରାନ୍ୱିତ ହେବା ପାଇଁ ଅଧିକ ବଳ ଆବଶ୍ୟକ କରେ।" },
+      { tag: "photosynthesis", en: "Plants absorb light energy using green chlorophyll in their leaves to make glucose.", hi: "पौधे ग्लूकोज बनाने के लिए अपनी पत्तियों में हरे क्लोरोफिल का उपयोग करके प्रकाश ऊर्जा को अवशोषित करते हैं।", mr: "झाडे ग्लुकोज बनवण्यासाठी पानांमधील हिरव्या क्लोरोफिलचा वापर करून प्रकाश ऊर्जा शोषून घेतात.", or: "ଉଦ୍ଭିଦଗୁଡ଼ିକ ଗ୍ଲୁକୋଜ୍ ତିଆରି କରିବା ପାଇଁ ସେମାନଙ୍କ ପତ୍ରରେ ଥିବା ସବୁଜ ହରିତକ ବ୍ୟବହାର କରି ଆଲୋକ ଶକ୍ତି ଶୋଷଣ କରନ୍ତି।" },
+      { tag: "electricity", en: "Electricity requires a closed loop (circuit) to flow. Watch out for open switches!", hi: "बिजली बहने के लिए एक बंद लूप (सर्किट) की आवश्यकता होती है। खुले स्विच पर ध्यान दें!", mr: "विद्युत प्रवाहासाठी बंद लूप (सर्किट) आवश्यक आहे. उघड्या स्विचकडे लक्ष द्या!", or: "ପ୍ରବାହିତ ହେବା ପାଇଁ ବିଦ୍ୟୁତ୍ ଏକ ବନ୍ଦ ଲୁପ୍ (ସର୍କିଟ୍) ଆବଶ୍ୟକ କରେ। ଖୋଲା ସୁଇଚ୍ ପ୍ରତି ଧ୍ୟାନ ଦିଅନ୍ତୁ!" },
+      { tag: "digestive", en: "The stomach uses strong acids to break down proteins. Chewing increases surface area for digestion.", hi: "पेट प्रोटीन को तोड़ने के लिए मजबूत एसिड का उपयोग करता है। चबाना पाचन के लिए सतह क्षेत्र को बढ़ाता है।", mr: "जठर प्रथिनांचे विघटन करण्यासाठी मजबूत ऍसिड वापरते. चावण्यामुळे पचनासाठी पृष्ठभागाचे क्षेत्रफळ वाढते.", or: "ପାକସ୍ଥଳୀ ପ୍ରୋଟିନ୍ ଭାଙ୍ଗିବା ପାଇଁ ଶକ୍ତିଶାଳୀ ଏସିଡ୍ ବ୍ୟବହାର କରେ। ଚୋବାଇବା ପାଚନ ପାଇଁ ପୃଷ୍ଠଭୂମି କ୍ଷେତ୍ର ବୃଦ୍ଧି କରେ।" },
+      { tag: "space", en: "Gravity holds the solar system together. The Sun has 99.8% of the system's mass!", hi: "गुरुत्वाकर्षण सौर मंडल को एक साथ रखता है। सूर्य के पास सौर मंडल के द्रव्यमान का 99.8% भाग है!", mr: "गुरुत्वाकर्षण सूर्यमालेला एकत्र धरून ठेवते. सूर्यामध्ये संपूर्ण सूर्यमालेच्या वस्तुमानाचा ९९.८% भाग आहे!", or: "ମାଧ୍ୟାକର୍ଷଣ ସୌରମଣ୍ଡଳକୁ ଏକାଠି ଧରି ରଖେ। ସୂର୍ଯ୍ୟଙ୍କ ପାଖରେ ସୌରମଣ୍ଡଳର ୯୯.୮% ବସ୍ତୁତ୍ଵ ରହିଛି!" }
+    ],
+    tech: [
+      { tag: "coding", en: "A loop repeats commands. A conditional check (if-else) makes decisions.", hi: "एक लूप कमांड को दोहराता है। एक सशर्त जांच (if-else) निर्णय लेती है।", mr: "लूप कमांडची पुनरावृत्ती करतो. अट तपासणी (if-else) निर्णय घेते.", or: "ଏକ ଲୁପ୍ ନିର୍ଦ୍ଦେଶଗୁଡ଼ିକୁ ପୁନରାବୃତ୍ତି କରେ। ଏକ ସର୍ତ୍ତମୂଳକ ଯାଞ୍च (if-else) ନିଷ୍ପତ୍ତି ନିଏ।" },
+      { tag: "internet", en: "The internet uses packet switching. Information is chopped into tiny packets and rebuilt.", hi: "इंटरनेट पैकेट स्विचिंग का उपयोग करता है। जानकारी को छोटे पैकेटों में काटा और पुनर्निर्मित किया जाता है।", mr: "इंटरनेट पॅकेट स्विचिंग वापरते. माहिती लहान पॅकेटमध्ये कापली जाते आणि पुन्हा तयार केली जाते.", or: "ଇଣ୍ଟରନେଟ୍ ପ୍ୟାକେଟ୍ ସୁଇଚିଂ ବ୍ୟବହାର କରେ। ସୂଚନା ଛୋଟ ପ୍ୟାକେଟରେ କଟାଯାଇ ପୁନର୍ବାର ନିର୍ମାଣ କରାଯାଏ।" },
+      { tag: "security", en: "Use mixed characters for strong passwords. Avoid dictionary words or birthdays.", hi: "मजबूत पासवर्ड के लिए मिश्रित वर्णों का उपयोग करें। शब्दकोश के शब्दों या जन्मदिन से बचें।", mr: "मजबूत पासवर्डसाठी मल्टिपल अक्षरे वापरा. शब्दकोशातील शब्द किंवा वाढदिवस टाळा.", or: "ଶକ୍ତିଶାଳୀ ପାସୱାର୍ଡ ପାଇଁ ମିଶ୍ରିତ ଅକ୍ଷର ବ୍ୟବହାର କରନ୍ତୁ। ଅଭିଧାନ ଶବ୍ଦ କିମ୍ବା ଜନ୍ମଦିନରୁ ଦୂରେଇ ରୁହନ୍ତୁ।" },
+      { tag: "ai", en: "Machine learning learns patterns from data. Bad data leads to bad predictions.", hi: "मशीन लर्निंग डेटा से पैटर्न सीखता है। खराब डेटा से खराब भविष्यवाणियां होती हैं।", mr: "मशीन लर्निंग डेटावरून पॅटर्न शिकते. खराब डेटामुळे चुकीचे अंदाज वर्तवले जातात.", or: "ମେସିନ୍ ଲର୍ଣ୍ଣିଂ ଡାଟାରୁ ପ୍ୟାଟର୍ଣ୍ଣ ଶିଖେ। ଖରାପ ଡାଟା ଖରାପ ପୂର୍ବାନୁମାନ କରିଥାଏ।" }
+    ],
+    group: [
+      { tag: "design", en: "Design thinking begins with empathy—understanding the actual users and their needs first.", hi: "डिज़ाइन थिंकिंग सहानुभूति के साथ शुरू होती है—सबसे पहले वास्तविक उपयोगकर्ताओं और उनकी आवश्यकताओं को समझना।", mr: "डिझाइन थिंकिंग सहानुभूतीने सुरू होते—प्रथम वास्तविक वापरकर्ते आणि त्यांच्या गरजा समजून घेणे.", or: "ଡିଜାଇନ୍ ଚିନ୍ତାଧାରା ସହାନୁଭୂତିରୁ ଆରମ୍ଭ ହୁଏ - ପ୍ରଥମେ ପ୍ରକୃତ ବ୍ୟବହାରକାରୀ ଏବଂ ସେମାନଙ୍କର ଆବଶ୍ୟକତାକୁ ବୁଝିବା।" },
+      { tag: "machines", en: "Simple machines make work easier by multiplying force or changing direction.", hi: "सरल मशीनें बल को बढ़ाकर या दिशा बदलकर काम को आसान बनाती हैं।", mr: "साधी यंत्रे बल वाढवून किंवा दिशा बदलून काम सोपे करतात.", or: "ସରଳ ଯନ୍ତ୍ରଗୁଡ଼ିକ ବଳ ବୃଦ୍ଧି କରି କିମ୍ବା ଦିଗ ପରିବର୍ତ୍ତନ କରି କାର୍ଯ୍ୟକୁ ସହଜ କରିଥାଏ।" },
+      { tag: "bridges", en: "Bridges distribute weight. Suspension bridges distribute load tension into anchorages.", hi: "पुल वजन वितरित करते हैं। सस्पेंशन पुल एंकरेज में भार तनाव वितरित करते हैं।", mr: "पूल वजन विभागून घेतात. सस्पेंशन पूल अँकरेजमध्ये लोडचे ताण विभागतात.", or: "ପୋଲଗୁଡ଼ିକ ଓଜନ ବଣ୍ଟନ କରନ୍ତି। ସସପେନ୍ସନ୍ ପୋଲଗୁଡ଼ିକ ଭାରର ଟେନସନକୁ ଆଙ୍କରେଜ୍ ମଧ୍ୟକୁ ବଣ୍ଟନ କରନ୍ତି।" }
+    ]
+  };
+
+  const templates = subjectTemplates[subjectCode] || subjectTemplates['math'];
+  templates.forEach(t => {
+    hints.push(t);
+    hints.push({
+      tag: t.tag,
+      hint_en: `Quick tip: ${t.hint_en}`,
+      hint_hi: `त्वरित सुझाव: ${t.hint_hi}`,
+      hint_mr: `द्रुत टीप: ${t.hint_mr}`,
+      hint_or: `ତୁରନ୍ତ ଟିପ୍ସ: ${t.hint_or}`
+    });
+  });
+
+  const generalTemplates = [
+    { tag: "study", en: "Failure is proof that you are trying! Take a breath, read the explanation, and try again.", hi: "असफलता इस बात का प्रमाण है कि आप कोशिश कर रहे हैं! सांस लें, स्पष्टीकरण पढ़ें, और पुनः प्रयास करें।", mr: "अपयश हा पुरावा आहे की तुम्ही प्रयत्न करत आहात! श्वास घ्या, स्पष्टीकरण वाचा आणि पुन्हा प्रयत्न करा.", or: "ବିଫଳତା ହେଉଛି ପ୍ରମାଣ ଯେ ଆପଣ ଚେଷ୍ଟା କରୁଛନ୍ତି! ନିଶ୍ୱାସ ନିଅନ୍ତୁ, ସ୍ପଷ୍ଟୀକରଣ ପଢନ୍ତୁ ଏବଂ ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।" },
+    { tag: "learn", en: "Slow and steady wins the race. Understanding the concept is more important than the points.", hi: "धीमा और स्थिर रेस जीतता है। अवधारणा को समझना अंकों से अधिक महत्वपूर्ण है।", mr: "हळूहळू आणि सातत्याने शर्यत जिंकता येते. गुणांपेक्षा संकल्पना समजून घेणे जास्त महत्त्वाचे आहे.", or: "ଧିର ଏବଂ ସ୍ଥିର ଦୌଡ଼ ଜିତେ। ବିଷୟବସ୍ତୁକୁ ବୁଝିବା ମାର୍କ ଅପେକ୍ଷା ଅଧିକ ଗୁରୁତ୍ଵପୂର୍ଣ୍ଣ।" },
+    { tag: "practice", en: "STEM is all about questioning! Ask yourself why the other options were wrong.", hi: "STEM का मतलब सवाल पूछना है! अपने आप से पूछें कि अन्य विकल्प क्यों गलत थे।", mr: "STEM म्हणजे प्रश्न विचारणे! इतर पर्याय का चुकीचे होते ते स्वतःला विचारा.", or: "STEM କେବଳ ପ୍ରଶ୍ନ ପଚାରିବା ବିଷୟରେ! ନିଜକୁ ପଚାରନ୍ତୁ କାହିଁକି ଅନ୍ୟ ବିକଳ୍ପଗୁଡ଼ିକ ଭୁଲ୍ ଥିଲା।" },
+    { tag: "science", en: "STEM is around us! Look for everyday examples of this concept in your home or village.", hi: "STEM हमारे चारों ओर है! अपने घर या गाँव में इस अवधारणा के दैनिक उदाहरण खोजें।", mr: "STEM आपल्या अवतीभोवती आहे! तुमच्या घरात किंवा गावात या संकल्पनेची रोजची उदाहरणे शोधा.", or: "STEM ଆମ ଚାରିପାଖରେ ଅଛି! ଆପଣଙ୍କ ଘର କିମ୍ବା ଗାଁରେ ଏହି ବିଷୟର ଦୈନନ୍ଦିନ ଉଦାହରଣ ଖୋଜନ୍ତୁ।" }
+  ];
+
+  generalTemplates.forEach(t => {
+    hints.push(t);
+    hints.push({
+      tag: t.tag,
+      hint_en: `Keep in mind: ${t.hint_en}`,
+      hint_hi: `ध्यान रखें: ${t.hint_hi}`,
+      hint_mr: `लक्षात ठेवा: ${t.hint_mr}`,
+      hint_or: `ଧ୍ୟାନ ଦିଅନ୍ତୁ: ${t.hint_or}`
+    });
+    hints.push({
+      tag: t.tag,
+      hint_en: `Pro Tip: ${t.hint_en}`,
+      hint_hi: `विशेष सुझाव: ${t.hint_hi}`,
+      hint_mr: `विशेष टीप: ${t.hint_mr}`,
+      hint_or: `ବିଶେଷ ଟିପ୍ସ: ${t.hint_or}`
+    });
+  });
+
+  while (hints.length < 60) {
+    hints.push({
+      tag: "general",
+      hint_en: "Practice makes progress. Try to solve similar STEM questions to strengthen your understanding!",
+      hint_hi: "अभ्यास प्रगति लाता है। अपनी समझ को मजबूत करने के लिए समान स्टेम प्रश्नों को हल करने का प्रयास करें!",
+      hint_mr: "सराव प्रगती घडवतो. तुमची समज बळकट करण्यासाठी समान STEM प्रश्न सोडवण्याचा प्रयत्न करा!",
+      hint_or: "ଅଭ୍ୟାସ ଉନ୍ନତି ଆଣିଥାଏ। ଆପଣଙ୍କର ବୁଝିବା ଶକ୍ତିକୁ ଦୃଢ କରିବା ପାଇଁ ସମାନ ପ୍ରକାର ପ୍ରଶ୍ନ ସମାଧାନ କରନ୍ତୁ।"
+    });
+  }
+
+  return hints;
+}
+
+app.get('/api/offline/download-hints/:lessonId', auth, async (req, res) => {
+  const lessonId = parseInt(req.params.lessonId);
+  const userId = req.user.id;
+
+  try {
+    const lesson = db.prepare(`
+      SELECT l.*, s.name as subject_name, s.code as subject_code 
+      FROM lessons l 
+      JOIN subjects s ON l.subject_id = s.id 
+      WHERE l.id = ?
+    `).get(lessonId);
+
+    if (!lesson) {
+      return res.status(404).json({ error: 'Lesson not found' });
+    }
+
+    const progress = db.prepare('SELECT score, attempts FROM user_progress WHERE user_id = ? AND lesson_id = ?').get(userId, lessonId);
+    
+    let hints = [];
+    if (process.env.GROQ_API_KEY) {
+      try {
+        const attemptInfo = progress 
+          ? `The student has attempted this quiz ${progress.attempts} times with a highest score of ${progress.score}.` 
+          : "The student has not attempted this quiz yet.";
+        
+        let contentObj = {};
+        try { contentObj = JSON.parse(lesson.content || '{}'); } catch(e) {}
+        const conceptsStr = Array.isArray(contentObj.concepts) ? contentObj.concepts.join(', ') : 'STEM concepts';
+
+        const prompt = `You are an encouraging adaptive AI STEM tutor for rural school children.
+Generate exactly 50 short on-device AI hints (15-20 words each) for the lesson "${lesson.title}" (Subject: ${lesson.subject_name}).
+Key Concepts: ${conceptsStr}.
+Student History: ${attemptInfo}
+Adjust hint difficulty accordingly: if they struggled, make them very simple and encouraging. If they excelled, add interesting stretch facts.
+
+Each hint must have:
+- 'tag': a keyword mapping to potential question topics (e.g. "variable", "force", "fraction")
+- 'hint_en': English hint
+- 'hint_hi': Hindi hint
+- 'hint_mr': Marathi hint
+- 'hint_or': Odia hint
+
+Format the output strictly as a JSON array of objects. Do not write any markdown wrappers, backticks, or comments. Just return the raw JSON array.`;
+
+        const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.GROQ_API_KEY.trim()}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            model: 'llama-3.1-8b-instant',
+            messages: [
+              { role: 'system', content: 'You are a JSON-only API helper. Do not output anything other than a JSON array.' },
+              { role: 'user', content: prompt }
+            ],
+            temperature: 0.7,
+            max_tokens: 3000
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const jsonText = data.choices[0].message.content.trim();
+          const cleanedText = jsonText.replace(/^```json/, '').replace(/```$/, '').trim();
+          hints = JSON.parse(cleanedText);
+          console.log(`Successfully generated ${hints.length} AI hints for lesson ${lessonId} using Groq`);
+        }
+      } catch (err) {
+        console.error('Error generating hints using Groq:', err);
+      }
+    }
+
+    if (!Array.isArray(hints) || hints.length < 50) {
+      console.log(`Using fallback hint generator for lesson ${lessonId} (current count: ${hints?.length || 0})`);
+      const fallbackHints = generateFallbackHints(lesson, progress);
+      if (Array.isArray(hints)) {
+        hints = [...hints, ...fallbackHints];
+      } else {
+        hints = fallbackHints;
+      }
+    }
+
+    hints = hints.slice(0, 50);
+    res.json({ lessonId, hints });
+
+  } catch (err) {
+    console.error('API download-hints error:', err);
+    res.status(500).json({ error: 'Server error downloading hints' });
+  }
+});
+
 app.get('*', (req, res) => res.sendFile(path.join(__dirname, '../frontend/index.html')));
 
-app.listen(PORT, () => console.log('STEM Platform running at http://localhost:' + PORT));
+// ===== SOCKET.IO GAME BATTLE SYSTEM =====
+const rooms = {};
+
+// JWT Authentication for Sockets
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Authentication error: No token provided'));
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET);
+    socket.user = decoded;
+    
+    // Fetch profile details
+    const userDetails = db.prepare('SELECT name, avatar FROM users WHERE id = ?').get(decoded.id);
+    if (userDetails) {
+      socket.user.name = userDetails.name;
+      socket.user.avatar = userDetails.avatar;
+    } else {
+      socket.user.name = 'Student';
+      socket.user.avatar = '🧑‍🎓';
+    }
+    next();
+  } catch (err) {
+    next(new Error('Authentication error: Invalid token'));
+  }
+});
+
+io.on('connection', (socket) => {
+  console.log(`User connected to Socket.io: ${socket.user.name} (${socket.user.id})`);
+
+  socket.on('createRoom', ({ subjectCode }) => {
+    // Generate 6-digit room code
+    let roomCode;
+    do {
+      roomCode = Math.floor(100000 + Math.random() * 900000).toString();
+    } while (rooms[roomCode]);
+
+    rooms[roomCode] = {
+      code: roomCode,
+      subjectCode: subjectCode || 'any',
+      players: [
+        {
+          id: socket.user.id,
+          name: socket.user.name,
+          avatar: socket.user.avatar,
+          socketId: socket.id,
+          score: 0,
+          answered: false,
+          lastAnswerCorrect: false
+        }
+      ],
+      questions: [],
+      currentQuestionIndex: 0,
+      state: 'waiting',
+      timer: null,
+      countdown: 10,
+      rematchRequested: {}
+    };
+
+    socket.join(roomCode);
+    socket.roomCode = roomCode;
+    socket.emit('roomCreated', { roomCode, subjectCode, player: rooms[roomCode].players[0] });
+    console.log(`Room ${roomCode} created for subject ${subjectCode} by ${socket.user.name}`);
+  });
+
+  socket.on('joinRoom', ({ roomCode }) => {
+    const room = rooms[roomCode];
+    if (!room) {
+      socket.emit('roomError', { message: 'Room not found / रूम नहीं मिला' });
+      return;
+    }
+    if (room.players.length >= 2) {
+      socket.emit('roomError', { message: 'Room is full / रूम फुल है' });
+      return;
+    }
+    // Prevent duplicate joining
+    if (room.players.find(p => p.id === socket.user.id)) {
+      socket.emit('roomError', { message: 'You are already in this room' });
+      return;
+    }
+
+    const opponent = {
+      id: socket.user.id,
+      name: socket.user.name,
+      avatar: socket.user.avatar,
+      socketId: socket.id,
+      score: 0,
+      answered: false,
+      lastAnswerCorrect: false
+    };
+
+    room.players.push(opponent);
+    socket.join(roomCode);
+    socket.roomCode = roomCode;
+
+    io.to(roomCode).emit('roomJoined', { roomCode, players: room.players });
+    console.log(`User ${socket.user.name} joined room ${roomCode}`);
+
+    // Automatically start the battle!
+    startBattle(roomCode);
+  });
+
+  socket.on('submitAnswer', ({ answer }) => {
+    const roomCode = socket.roomCode;
+    const room = rooms[roomCode];
+    if (!room || room.state !== 'question') return;
+
+    const player = room.players.find(p => p.socketId === socket.id);
+    if (!player || player.answered) return;
+
+    const currentQuestion = room.questions[room.currentQuestionIndex];
+    const isCorrect = answer === currentQuestion.correct_answer;
+
+    player.answered = true;
+    player.lastAnswerCorrect = isCorrect;
+    if (isCorrect) {
+      player.score += 1;
+    }
+
+    // Broadcast that player answered (don't reveal if correct yet, just status)
+    io.to(roomCode).emit('playerAnswered', {
+      playerId: player.id,
+      playersStatus: room.players.map(p => ({ id: p.id, answered: p.answered }))
+    });
+
+    // Check if both players answered
+    const allAnswered = room.players.every(p => p.answered);
+    if (allAnswered) {
+      clearTimeout(room.timer);
+      showQuestionResult(roomCode);
+    }
+  });
+
+  socket.on('requestRematch', () => {
+    const roomCode = socket.roomCode;
+    const room = rooms[roomCode];
+    if (!room || room.state !== 'finished') return;
+
+    room.rematchRequested[socket.id] = true;
+    
+    // Notify opponent
+    socket.to(roomCode).emit('rematchPrompt', { fromName: socket.user.name });
+
+    const opponentSocketId = room.players.find(p => p.socketId !== socket.id)?.socketId;
+    
+    // If both requested, start rematch!
+    if (opponentSocketId && room.rematchRequested[opponentSocketId]) {
+      console.log(`Rematch started for room ${roomCode}`);
+      // Re-initialize room state
+      room.players.forEach(p => {
+        p.score = 0;
+        p.answered = false;
+        p.lastAnswerCorrect = false;
+      });
+      room.currentQuestionIndex = 0;
+      room.questions = [];
+      room.state = 'waiting';
+      room.rematchRequested = {};
+      
+      startBattle(roomCode);
+    }
+  });
+
+  socket.on('disconnect', () => {
+    console.log(`User disconnected from Socket.io: ${socket.user.name}`);
+    const roomCode = socket.roomCode;
+    const room = rooms[roomCode];
+    if (room) {
+      // Remove player
+      room.players = room.players.filter(p => p.socketId !== socket.id);
+      if (room.players.length === 0) {
+        clearTimeout(room.timer);
+        delete rooms[roomCode];
+        console.log(`Room ${roomCode} deleted (empty)`);
+      } else {
+        // Notify remaining player that opponent disconnected
+        io.to(roomCode).emit('opponentDisconnected', { message: 'Opponent disconnected. You win by default! / प्रतिद्वंद्वी डिस्कनेक्ट हो गया।' });
+        // Award default win XP
+        awardXP(room.players[0].id, 50);
+        room.state = 'finished';
+        clearTimeout(room.timer);
+      }
+    }
+  });
+});
+
+// Start synchronized battle
+function startBattle(roomCode) {
+  const room = rooms[roomCode];
+  if (!room) return;
+
+  room.state = 'countdown';
+  
+  // Fetch random questions from the database
+  let questions = [];
+  try {
+    if (room.subjectCode && room.subjectCode !== 'any') {
+      questions = db.prepare(`
+        SELECT q.*, s.color as subject_color FROM questions q
+        JOIN lessons l ON q.lesson_id = l.id
+        JOIN subjects s ON l.subject_id = s.id
+        WHERE s.code = ?
+        ORDER BY RANDOM() LIMIT 5
+      `).all(room.subjectCode);
+    } else {
+      questions = db.prepare(`
+        SELECT q.*, s.color as subject_color FROM questions q
+        JOIN lessons l ON q.lesson_id = l.id
+        JOIN subjects s ON l.subject_id = s.id
+        ORDER BY RANDOM() LIMIT 5
+      `).all();
+    }
+  } catch (err) {
+    console.error('Error fetching questions for battle:', err);
+  }
+
+  // If not enough questions, fallback to any random questions
+  if (questions.length === 0) {
+    questions = db.prepare('SELECT * FROM questions ORDER BY RANDOM() LIMIT 5').all();
+  }
+
+  room.questions = questions;
+  const subjectColor = questions[0]?.subject_color || '#FF6B35';
+
+  // Send start event with questions (hide correct answers for security)
+  const sanitisedQuestions = questions.map(q => ({
+    id: q.id,
+    question: q.question,
+    question_hi: q.question_hi,
+    question_mr: q.question_mr,
+    question_or: q.question_or,
+    option_a: q.option_a,
+    option_b: q.option_b,
+    option_c: q.option_c,
+    option_d: q.option_d
+  }));
+
+  io.to(roomCode).emit('battleStart', {
+    players: room.players.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, score: p.score })),
+    questionsCount: sanitisedQuestions.length,
+    subjectColor
+  });
+
+  // Ready 3-second countdown
+  let readyCountdown = 3;
+  const interval = setInterval(() => {
+    io.to(roomCode).emit('countdownTick', readyCountdown);
+    readyCountdown--;
+    if (readyCountdown < 0) {
+      clearInterval(interval);
+      sendQuestion(roomCode, sanitisedQuestions);
+    }
+  }, 1000);
+}
+
+// Send a question to players
+function sendQuestion(roomCode, sanitisedQuestions) {
+  const room = rooms[roomCode];
+  if (!room || room.state === 'finished') return;
+
+  room.state = 'question';
+  room.players.forEach(p => {
+    p.answered = false;
+    p.lastAnswerCorrect = false;
+  });
+
+  const questionIdx = room.currentQuestionIndex;
+  const question = sanitisedQuestions[questionIdx];
+
+  io.to(roomCode).emit('nextQuestion', {
+    questionIndex: questionIdx,
+    question,
+    players: room.players.map(p => ({ id: p.id, name: p.name, avatar: p.avatar, score: p.score, answered: false }))
+  });
+
+  room.countdown = 10;
+  
+  // Timer tick loop
+  const timerTick = () => {
+    io.to(roomCode).emit('timerTick', room.countdown);
+    room.countdown--;
+    if (room.countdown < 0) {
+      showQuestionResult(roomCode);
+    } else {
+      room.timer = setTimeout(timerTick, 1000);
+    }
+  };
+
+  room.timer = setTimeout(timerTick, 1000);
+}
+
+// Show correct answer result after question ends
+function showQuestionResult(roomCode) {
+  const room = rooms[roomCode];
+  if (!room) return;
+
+  clearTimeout(room.timer);
+  room.state = 'result';
+
+  const currentQuestion = room.questions[room.currentQuestionIndex];
+  
+  // Reveal details
+  io.to(roomCode).emit('questionResult', {
+    correctAnswer: currentQuestion.correct_answer,
+    explanation: currentQuestion.explanation,
+    players: room.players.map(p => ({
+      id: p.id,
+      score: p.score,
+      answered: p.answered,
+      correct: p.lastAnswerCorrect
+    }))
+  });
+
+  // Move to next question or end battle after 4 seconds (time to read explanation)
+  setTimeout(() => {
+    room.currentQuestionIndex++;
+    if (room.currentQuestionIndex < room.questions.length) {
+      const sanitisedQuestions = room.questions.map(q => ({
+        id: q.id,
+        question: q.question,
+        question_hi: q.question_hi,
+        question_mr: q.question_mr,
+        question_or: q.question_or,
+        option_a: q.option_a,
+        option_b: q.option_b,
+        option_c: q.option_c,
+        option_d: q.option_d
+      }));
+      sendQuestion(roomCode, sanitisedQuestions);
+    } else {
+      endBattle(roomCode);
+    }
+  }, 4000);
+}
+
+// End Battle and award XP
+function endBattle(roomCode) {
+  const room = rooms[roomCode];
+  if (!room) return;
+
+  room.state = 'finished';
+  const players = room.players;
+
+  if (players.length < 2) {
+    return;
+  }
+
+  const p1 = players[0];
+  const p2 = players[1];
+
+  let p1XP = p1.score * 10;
+  let p2XP = p2.score * 10;
+  let winnerId = null;
+  let loserId = null;
+
+  if (p1.score > p2.score) {
+    p1XP = p1XP * 2; // Double XP bonus for winner
+    winnerId = p1.id;
+    loserId = p2.id;
+  } else if (p2.score > p1.score) {
+    p2XP = p2XP * 2; // Double XP bonus for winner
+    winnerId = p2.id;
+    loserId = p1.id;
+  }
+
+  // Award XP to users in the database
+  try {
+    awardXP(p1.id, p1XP);
+    awardXP(p2.id, p2XP);
+  } catch (err) {
+    console.error('Error awarding XP after battle:', err);
+  }
+
+  io.to(roomCode).emit('battleFinished', {
+    winnerId,
+    loserId,
+    p1: { id: p1.id, name: p1.name, score: p1.score, xpEarned: p1XP },
+    p2: { id: p2.id, name: p2.name, score: p2.score, xpEarned: p2XP }
+  });
+}
+
+// Award XP function (database wrapper)
+function awardXP(userId, xpEarned) {
+  if (xpEarned <= 0) return;
+  db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpEarned, userId);
+  db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(userId);
+  db.prepare('UPDATE leaderboard SET total_xp = total_xp + ? WHERE user_id = ?').run(xpEarned, userId);
+  
+  const dateStr = new Date().toISOString().split('T')[0];
+  const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(userId, dateStr);
+  if (existingDaily) {
+    db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpEarned, existingDaily.id);
+  } else {
+    db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(userId, dateStr, xpEarned);
+  }
+}
+
+server.listen(PORT, () => {
+  console.log('STEM Platform running at http://localhost:' + PORT);
+  if (httpsServer) {
+    httpsServer.listen(HTTPS_PORT, () => {
+      console.log('🔐 Secure HTTPS Server running at https://localhost:' + HTTPS_PORT + ' (Required for camera access on other LAN devices)');
+    });
+  }
+});

@@ -801,4 +801,649 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:'Hind',
 .scan-tips{display:flex;flex-direction:column;gap:6px;padding:14px 20px 4px;}
 .tip-item{font-size:0.78rem;color:var(--text3);display:flex;align-items:center;gap:6px;}
 
+/* ===== MULTIPLAYER QUIZ BATTLE ARENA STYLING ===== */
+
+.battle-scoreboard-wrap {
+  display: grid;
+  grid-template-columns: 1fr 80px 1fr;
+  align-items: center;
+  gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 768px) {
+  .battle-scoreboard-wrap {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto auto;
+    justify-items: center;
+    gap: 16px;
+  }
+  .player-score-card.p2-card {
+    flex-direction: row !important;
+    text-align: left !important;
+  }
+}
+
+.player-score-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  width: 100%;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.player-score-card.p1-card {
+  border-left: 4px solid var(--primary);
+}
+
+.player-score-card.p2-card {
+  border-left: 4px solid var(--purple);
+  flex-direction: row-reverse;
+  text-align: right;
+}
+
+.player-score-card.answered {
+  border-color: var(--secondary);
+  box-shadow: 0 0 12px rgba(78, 205, 196, 0.2);
+}
+
+.player-score-avatar {
+  font-size: 2.2rem;
+  width: 50px;
+  height: 50px;
+  background: var(--bg3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border: 2px solid var(--border);
+}
+
+.player-score-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.player-score-name {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.player-score-points {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 800;
+  font-size: 1.2rem;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+.player-status-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: var(--bg3);
+  color: var(--text2);
+  white-space: nowrap;
+}
+
+.player-status-badge.thinking {
+  background: rgba(255, 230, 109, 0.15);
+  color: var(--accent);
+  animation: pulseOpacity 1s infinite alternate;
+}
+
+.player-status-badge.submitted {
+  background: rgba(123, 104, 238, 0.15);
+  color: var(--purple);
+}
+
+.player-status-badge.correct {
+  background: rgba(78, 205, 196, 0.15);
+  color: var(--secondary);
+}
+
+.player-status-badge.wrong {
+  background: rgba(255, 107, 107, 0.15);
+  color: #FF6B6B;
+}
+
+.player-status-badge.timeout {
+  background: rgba(107, 128, 153, 0.15);
+  color: var(--text3);
+}
+
+@keyframes pulseOpacity {
+  0% { opacity: 0.6; }
+  100% { opacity: 1; }
+}
+
+/* Timer Circular SVG */
+.battle-timer-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.battle-timer-circle {
+  position: relative;
+  width: 68px;
+  height: 68px;
+}
+
+.timer-svg {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.timer-bg {
+  fill: none;
+  stroke: var(--bg3);
+  stroke-width: 3.5;
+}
+
+.timer-stroke {
+  fill: none;
+  stroke: var(--secondary);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+  transition: stroke-dasharray 1s linear, stroke 0.3s ease;
+}
+
+.battle-timer-val {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Baloo 2', cursive;
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--text);
+}
+
+/* Battle overlays */
+.battle-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 25, 35, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.25s ease;
+}
+
+.battle-overlay.hidden {
+  display: none !important;
+}
+
+.battle-overlay-box {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 30px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  max-width: 300px;
+  width: 90%;
+  animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.battle-countdown-num {
+  font-family: 'Baloo 2', cursive;
+  font-size: 4rem;
+  font-weight: 800;
+  color: var(--primary);
+  line-height: 1;
+  margin-top: 10px;
+  animation: pulseScale 1s infinite alternate;
+}
+
+@keyframes pulseScale {
+  0% { transform: scale(0.9); }
+  100% { transform: scale(1.15); }
+}
+
+/* Lobby player card */
+.player-lobby-card {
+  background: var(--bg2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  width: 130px;
+  text-align: center;
+}
+
+.player-lobby-avatar {
+  font-size: 2.5rem;
+  width: 60px;
+  height: 60px;
+  background: var(--bg3);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 10px;
+  border: 2px solid var(--border);
+}
+
+.player-lobby-name {
+  font-family: 'Baloo 2', cursive;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== OFFLINE AI HINTS STYLING ===== */
+.quiz-offline-hint {
+  background: linear-gradient(135deg, rgba(255, 230, 109, 0.08), rgba(78, 205, 196, 0.05));
+  border: 1px dashed rgba(255, 230, 109, 0.4);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 16px;
+  margin-top: 15px;
+  margin-bottom: 15px;
+  animation: slideDownFadeIn 0.35s ease-out;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+}
+
+.quiz-offline-hint .hint-label {
+  font-family: 'Baloo 2', cursive;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.quiz-offline-hint .hint-text {
+  font-size: 0.88rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+
+@keyframes slideDownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
+
+/* ===== SMART FOCUS MODE — ALL STYLES ===== */
+
+/* Visibility utility — used exclusively by Smart Focus elements */
+.sf-hidden { display: none !important; }
+
+/* Consent modal overlay */
+.sf-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.75);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+  animation: sfFadeIn 0.25s ease;
+}
+.sf-modal.sf-hidden { display: none !important; }
+@keyframes sfFadeIn { from{opacity:0;} to{opacity:1;} }
+
+.sf-modal-box {
+  background: var(--card);
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius);
+  padding: 28px 24px;
+  max-width: 400px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 16px 48px rgba(78,205,196,0.3);
+  animation: sfSlideUp 0.3s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes sfSlideUp { from{opacity:0;transform:translateY(24px);} to{opacity:1;transform:translateY(0);} }
+
+
+
+/* Toggle area in home-header */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.smart-focus-toggle-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+}
+.smart-focus-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.sf-icon { font-size: 1rem; }
+.sf-text {
+  font-size: 0.72rem;
+  color: var(--secondary);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* Toggle switch */
+.sf-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 26px;
+  cursor: pointer;
+}
+.sf-switch input { opacity: 0; width: 0; height: 0; }
+.sf-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--bg3);
+  border: 1.5px solid var(--border);
+  border-radius: 26px;
+  transition: background 0.3s, border-color 0.3s;
+}
+.sf-slider::before {
+  content: '';
+  position: absolute;
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 3px;
+  background: var(--text3);
+  border-radius: 50%;
+  transition: transform 0.3s, background 0.3s;
+}
+.sf-switch input:checked + .sf-slider {
+  background: linear-gradient(135deg, var(--secondary), var(--purple));
+  border-color: var(--secondary);
+}
+.sf-switch input:checked + .sf-slider::before {
+  transform: translateX(20px);
+  background: #fff;
+}
+
+/* Floating camera widget */
+.sf-widget {
+  position: fixed;
+  bottom: 90px;
+  right: 16px;
+  width: 200px;
+  background: var(--card);
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(78,205,196,0.25);
+  z-index: 1200;
+  transition: width 0.3s;
+}
+.sf-widget.sf-hidden { display: none !important; }
+.sf-widget.minimised .sf-camera-wrap { display: none; }
+.sf-widget.minimised { width: 160px; }
+
+.sf-widget-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+}
+.sf-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text3);
+  flex-shrink: 0;
+  transition: background 0.4s;
+}
+.sf-status-dot.active  { background: #4ade80; box-shadow: 0 0 6px #4ade80; animation: pulse-green 2s infinite; }
+.sf-status-dot.warning { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
+.sf-status-dot.alert   { background: #f87171; box-shadow: 0 0 6px #f87171; animation: pulse-red 1s infinite; }
+@keyframes pulse-green { 0%,100%{opacity:1;}50%{opacity:0.5;} }
+@keyframes pulse-red   { 0%,100%{opacity:1;}50%{opacity:0.4;} }
+.sf-status-text { font-size: 0.72rem; color: var(--text2); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sf-minimize-btn, .sf-close-btn {
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 0.8rem;
+  cursor: pointer;
+  padding: 0 2px;
+  line-height: 1;
+  transition: color 0.2s;
+}
+.sf-minimize-btn:hover { color: var(--secondary); }
+.sf-close-btn:hover    { color: #f87171; }
+
+/* Camera + video area */
+.sf-camera-wrap {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4/3;
+  background: #000;
+  overflow: hidden;
+}
+.sf-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transform: scaleX(-1); /* mirror effect */
+}
+.sf-emotion-badge {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  background: rgba(0,0,0,0.65);
+  backdrop-filter: blur(4px);
+  color: #fff;
+  letter-spacing: 0.02em;
+  transition: background 0.4s;
+}
+.sf-emotion-badge.focused    { color: #4ade80; }
+.sf-emotion-badge.happy      { color: #facc15; }
+.sf-emotion-badge.confused   { color: var(--accent); }
+.sf-emotion-badge.frustrated { color: #f97316; }
+.sf-emotion-badge.bored, .sf-emotion-badge.distracted { color: #f87171; }
+
+/* Engagement intervention popup */
+.sf-engagement-popup {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1300;
+}
+.sf-engagement-popup.sf-hidden { display: none !important; }
+@keyframes bounceIn {
+  from { opacity: 0; transform: translateX(-50%) scale(0.8); }
+  to   { opacity: 1; transform: translateX(-50%) scale(1);   }
+}
+.sf-popup-inner {
+  background: linear-gradient(135deg, var(--card), var(--card2));
+  border: 1.5px solid var(--secondary);
+  border-radius: var(--radius);
+  padding: 20px;
+  min-width: 260px;
+  max-width: 320px;
+  text-align: center;
+  box-shadow: 0 12px 40px rgba(78,205,196,0.3);
+  position: relative;
+}
+.sf-popup-icon  { font-size: 2.5rem; margin-bottom: 8px; }
+.sf-popup-title { font-family: 'Baloo 2', cursive; font-size: 1.1rem; color: var(--secondary); margin-bottom: 6px; }
+.sf-popup-body  { font-size: 0.85rem; color: var(--text2); line-height: 1.5; }
+.sf-popup-close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  font-size: 1rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.sf-popup-close:hover { color: var(--text); }
+
+/* Adaptive difficulty banner */
+.sf-adaptive-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.82rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+  animation: slideDownFadeIn 0.4s ease;
+}
+.sf-adaptive-banner.easier  { background: rgba(74,222,128,0.15); border: 1px solid #4ade80; color: #4ade80; }
+.sf-adaptive-banner.harder  { background: rgba(167,139,250,0.15); border: 1px solid #a78bfa; color: #a78bfa; }
+.sf-adaptive-banner.hint    { background: rgba(250,204,21,0.15);  border: 1px solid #facc15; color: #facc15; }
+.sf-adaptive-banner.focus   { background: rgba(78,205,196,0.15);  border: 1px solid var(--secondary); color: var(--secondary); }
+
+/* Body-level pulse when frustrated/distracted - adds calming overlay */
+body.sf-calm-pulse::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1100;
+  background: radial-gradient(ellipse at center, rgba(78,205,196,0.07) 0%, transparent 70%);
+  animation: calmPulse 3s ease-in-out infinite;
+}
+@keyframes calmPulse { 0%,100%{opacity:0;}50%{opacity:1;} }
+
+/* Troubleshooting Modal & Alerts */
+.sf-troubleshoot-box {
+  background: var(--card) !important;
+  border: 1.5px solid var(--secondary) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4) !important;
+}
+.sf-alert-danger {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px dashed #ef4444;
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  margin-bottom: 15px;
+  font-size: 0.85rem;
+  color: #f87171;
+  line-height: 1.5;
+}
+.sf-troubleshoot-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sf-troubleshoot-steps li {
+  position: relative;
+  padding-left: 28px;
+  font-size: 0.85rem;
+  color: var(--text2);
+  line-height: 1.5;
+}
+.sf-troubleshoot-steps li::before {
+  content: attr(data-step);
+  position: absolute;
+  left: 0;
+  top: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--card);
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sf-code-block {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  margin: 8px 0;
+  font-family: monospace;
+  font-size: 0.78rem;
+  color: var(--secondary);
+  overflow-x: auto;
+}
+.sf-copy-btn {
+  background: var(--secondary);
+  color: var(--card);
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+.sf-copy-btn:hover {
+  opacity: 0.9;
+}
+.sf-troubleshoot-content h3 {
+  font-size: 0.95rem;
+  color: var(--text);
+  margin: 0 0 8px 0;
+  font-weight: 600;
+}
+
 

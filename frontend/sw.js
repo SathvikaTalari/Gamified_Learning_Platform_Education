@@ -4,9 +4,12 @@ const ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
+  '/css/main.css',
   '/js/app.js',
   '/js/translations.js',
   '/js/games.js',
+  '/js/pico.js',
+  '/js/facefinder',
   '/manifest.json',
 ];
 

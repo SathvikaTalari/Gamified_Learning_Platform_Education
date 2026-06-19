@@ -9,6 +9,9 @@ let quizState = { questions:[], current:0, score:0, answered:false };
 let chartInstance = null;
 let scanStream = null;
 let scanCapturedImage = null;
+let socket = null;
+let battleRoomCode = null;
+let battleState = { questionsCount: 0, currentQuestionIndex: 0, players: [], timer: 10, answered: false };
 
 const API = '';
 
@@ -331,6 +334,15 @@ function showScreen(name) {
   if (name === 'teacher-home') loadTeacherHome();
   if (name === 'create-lesson') loadCreateLessonForm();
   if (name === 'my-content') loadMyContent();
+
+  // Cleanup multiplayer battle connection if navigating away from it
+  if (['home', 'subjects', 'leaderboard', 'badges', 'profile'].includes(name)) {
+    if (socket) {
+      socket.disconnect();
+      socket = null;
+      battleRoomCode = null;
+    }
+  }
 }
 
 function updateNavStats() {
@@ -585,18 +597,47 @@ async function openLesson(id) {
   currentLessonId = id;
   showScreen('lesson');
   try {
-    const lesson = await api('/api/lesson/' + id);
+    let lesson;
+    if (navigator.onLine) {
+      try {
+        lesson = await api('/api/lesson/' + id);
+      } catch (err) {
+        console.warn("Could not load lesson online, trying offline cache...", err);
+        lesson = await getOfflineLesson(id);
+      }
+    } else {
+      lesson = await getOfflineLesson(id);
+    }
+
+    if (!lesson) {
+      document.getElementById('lesson-content').innerHTML = `
+        <div class="content-card" style="text-align:center; padding:40px;">
+          <div style="font-size:3rem; margin-bottom:15px;">📶</div>
+          <h3>Offline / ऑफ़लाइन</h3>
+          <p style="color:var(--text2); margin-bottom:20px;">This lesson is not available offline. Please connect to the internet to download it!</p>
+          <button class="btn-primary" onclick="showScreen('home')">Go Home 🏠</button>
+        </div>
+      `;
+      return;
+    }
+
     const title = currentLanguage==='hi' && lesson.title_hi ? lesson.title_hi : currentLanguage==='mr' && lesson.title_mr ? lesson.title_mr : currentLanguage==='or' && lesson.title_or ? lesson.title_or : lesson.title;
     const c = lesson.content || {};
     const color = lesson.subject_color || 'var(--primary)';
 
     const vocab = vocabWords[lesson.title] || ['Science', 'Technology', 'Mathematics', 'Engineering'];
     const labelListen = { en: 'Listen', hi: 'सुनें', mr: 'ऐका', or: 'ଶୁଣନ୍ତୁ' }[currentLanguage] || 'Listen';
-    const labelPractice = { en: 'Practice', hi: 'अभ्यास करें', mr: 'सराव करा', or: 'ଅଭ୍ୟାସ' }[currentLanguage] || 'Practice';
+    const labelPractice = { en: 'Practice', hi: 'अभ्यास करें', mr: 'सराव करा', or: 'ଅଭ୍ୟาସ' }[currentLanguage] || 'Practice';
     const readBtnText = { en: '🔊 Read Aloud', hi: '🔊 पाठ सुनें', mr: '🔊 धडा वाचा', or: '🔊 ପାଠ ପଢନ୍ତୁ' }[currentLanguage] || '🔊 Read Aloud';
+
+    const isDownloaded = await checkIfLessonDownloaded(id);
+    const downloadBtnHtml = isDownloaded 
+      ? `<button id="btn-download-lesson" class="btn-read-lesson" onclick="downloadLessonOffline(${id})" style="background: rgba(78, 205, 196, 0.12); color: var(--secondary); border: 1px solid rgba(78, 205, 196, 0.3); margin-right:10px;">Offline Ready ✅</button>`
+      : `<button id="btn-download-lesson" class="btn-read-lesson" onclick="downloadLessonOffline(${id})" style="background: rgba(123, 104, 238, 0.12); color: var(--purple); border: 1px solid rgba(123, 104, 238, 0.3); margin-right:10px;">Download Offline 📥</button>`;
 
     document.getElementById('lesson-content').innerHTML = `
       <div class="lesson-header-controls" style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
+        ${downloadBtnHtml}
         <button id="btn-read-lesson" class="btn-read-lesson" onclick="readLessonAloud()">${readBtnText}</button>
       </div>
       <div class="lesson-hero" style="background:${color}22;border:1px solid ${color}44;">
@@ -678,10 +719,39 @@ function goBackFromLesson() {
 async function startQuiz(lessonId) {
   showScreen('quiz');
   try {
-    const lesson = await api('/api/lesson/' + lessonId);
-    quizState = { lessonId: lesson.id, questions: lesson.questions, current: 0, score: 0, answered: false, xpReward: lesson.xp_reward };
+    let lesson;
+    if (navigator.onLine) {
+      try {
+        lesson = await api('/api/lesson/' + lessonId);
+      } catch (err) {
+        console.warn("Could not fetch quiz online, loading offline cache...", err);
+        lesson = await getOfflineLesson(lessonId);
+      }
+    } else {
+      lesson = await getOfflineLesson(lessonId);
+    }
+
+    if (!lesson) {
+      showToast("❌ Quiz not available offline / यह क्विज़ ऑफ़लाइन उपलब्ध नहीं है");
+      showScreen('lesson');
+      openLesson(lessonId);
+      return;
+    }
+
+    quizState = { 
+      lessonId: lesson.id, 
+      questions: lesson.questions, 
+      current: 0, 
+      score: 0, 
+      answered: false, 
+      xpReward: lesson.xp_reward,
+      isOffline: !navigator.onLine 
+    };
     renderQuestion();
-  } catch(e) { console.error(e); }
+  } catch(e) { 
+    console.error(e); 
+    showToast("❌ Error starting quiz");
+  }
 }
 
 function renderQuestion() {
@@ -761,6 +831,7 @@ function renderQuestion() {
       <div class="explanation-label">💡 EXPLANATION</div>
       <div id="quiz-exp-text" class="explanation-text"></div>
     </div>
+    <div id="quiz-offline-hint" style="display:none" class="quiz-offline-hint"></div>
     <button id="quiz-next-btn" class="quiz-next-btn" style="display:none" onclick="nextQuestion()">
       ${current+1 < questions.length ? labelNext : labelResults}
     </button>
@@ -783,6 +854,9 @@ function selectAnswer(selected, correct, explanation) {
     document.getElementById('quiz-exp-text').textContent = explanation;
     expEl.style.display = 'block';
   }
+  if (!isCorrect) {
+    displayOfflineHint();
+  }
   document.getElementById('quiz-next-btn').style.display = 'block';
   if (isCorrect) showToast('✅ Correct! +10 points');
   else showToast('❌ Wrong! The correct answer is ' + correct);
@@ -803,6 +877,32 @@ async function renderResult() {
   else if (percentage >= 70) { emoji='🎉'; title=t('great'); }
   else if (percentage >= 50) { emoji='💪'; title=t('goodJob'); }
   else { emoji='📚'; title=t('keepTrying'); }
+
+  const isOfflineMode = !navigator.onLine || quizState.isOffline;
+  if (isOfflineMode) {
+    try {
+      await saveOfflineProgress(lessonId, score, total);
+      const xpEarnedVal = percentage >= 70 ? xpReward : Math.round(xpReward * 0.3);
+      document.getElementById('quiz-container').innerHTML = `
+        <div class="quiz-result">
+          <div class="result-emoji">${emoji}</div>
+          <div class="result-title">${title} (Offline / ऑफ़लाइन)</div>
+          <div class="result-score">${score} / ${total} correct (${percentage}%)</div>
+          <div class="result-xp">+${xpEarnedVal} XP pending sync ⚡</div>
+          <p style="color:var(--text3); font-size:0.8rem; margin:10px 0; line-height: 1.4;">Your score has been saved locally and will be synced when you go back online! / आपका स्कोर सुरक्षित कर लिया गया है।</p>
+          <div class="result-actions">
+            <button class="btn-primary" onclick="goBackFromLesson()">Back to Lesson 📖</button>
+            <button class="btn-secondary" onclick="startQuiz(${lessonId})">Try Again 🔄</button>
+            <button class="btn-secondary" onclick="showScreen('home')">Go Home 🏠</button>
+          </div>
+        </div>
+      `;
+    } catch(err) {
+      console.error("Error saving offline progress:", err);
+      document.getElementById('quiz-container').innerHTML = `<div class="quiz-result"><div class="result-emoji">${emoji}</div><div class="result-title">${title}</div><div class="result-score">${score} / ${total} correct</div><div class="result-actions"><button class="btn-primary" onclick="goBackFromLesson()">Back</button></div></div>`;
+    }
+    return;
+  }
 
   try {
     const result = await api('/api/quiz/submit','POST',{ lesson_id:lessonId, score, total });
@@ -1687,6 +1787,7 @@ function submitBlankAnswer(correct) {
   } else {
     inputEl.classList.add('input-wrong');
     showToast(`❌ Wrong! Correct answer is: ${correct}`);
+    displayOfflineHint();
   }
   
   const { questions, current } = quizState;
@@ -2174,3 +2275,1339 @@ function speakSolution() {
   utterance.onerror = () => { if (btn) btn.innerHTML = '🔊 Read Aloud'; };
   window.speechSynthesis.speak(utterance);
 }
+
+// ===== SOCKET.IO MULTIPLAYER BATTLE ARENA IMPLEMENTATION =====
+
+function initSocket() {
+  if (socket) return; // already initialized
+
+  console.log("Initializing Socket.io client connection...");
+  socket = io({
+    auth: {
+      token: currentToken
+    }
+  });
+
+  socket.on('connect', () => {
+    console.log('Connected to socket server successfully');
+  });
+
+  socket.on('connect_error', (err) => {
+    console.error('Socket connection error:', err.message);
+    showToast('❌ Socket connection error: ' + err.message);
+  });
+
+  socket.on('roomCreated', ({ roomCode, subjectCode, player }) => {
+    battleRoomCode = roomCode;
+    document.getElementById('waiting-room-code').textContent = roomCode;
+    document.getElementById('lobby-p1-avatar').textContent = player.avatar;
+    document.getElementById('lobby-p1-name').textContent = player.name + ' (You)';
+    document.getElementById('lobby-p2-avatar').textContent = '❓';
+    document.getElementById('lobby-p2-avatar').style.borderStyle = 'dashed';
+    document.getElementById('lobby-p2-avatar').style.background = 'transparent';
+    document.getElementById('lobby-p2-name').textContent = 'Waiting...';
+    document.getElementById('battle-waiting-area').classList.remove('hidden');
+  });
+
+  socket.on('roomJoined', ({ roomCode, players }) => {
+    battleRoomCode = roomCode;
+    document.getElementById('waiting-room-code').textContent = roomCode;
+
+    const p1 = players[0];
+    const p2 = players[1];
+
+    document.getElementById('lobby-p1-avatar').textContent = p1.avatar;
+    document.getElementById('lobby-p1-name').textContent = p1.name + (p1.id === currentUser.id ? ' (You)' : '');
+
+    document.getElementById('lobby-p2-avatar').textContent = p2.avatar;
+    document.getElementById('lobby-p2-avatar').style.borderStyle = 'solid';
+    document.getElementById('lobby-p2-avatar').style.background = 'var(--bg2)';
+    document.getElementById('lobby-p2-name').textContent = p2.name + (p2.id === currentUser.id ? ' (You)' : '');
+
+    document.getElementById('battle-waiting-area').classList.remove('hidden');
+  });
+
+  socket.on('roomError', ({ message }) => {
+    showToast('❌ ' + message);
+  });
+
+  socket.on('battleStart', ({ players, questionsCount, subjectColor }) => {
+    battleState.questionsCount = questionsCount;
+    battleState.players = players;
+
+    // Switch to battle arena screen
+    showScreen('quiz-battle-arena');
+
+    // Set scoreboard cards
+    const p1 = players.find(p => p.id === currentUser.id);
+    const p2 = players.find(p => p.id !== currentUser.id);
+
+    document.getElementById('arena-p1-avatar').textContent = p1.avatar;
+    document.getElementById('arena-p1-name').textContent = p1.name;
+    document.getElementById('arena-p1-score').textContent = '0 pts';
+    document.getElementById('arena-p1-status').textContent = 'Waiting';
+    document.getElementById('arena-p1-status').className = 'player-status-badge';
+    document.getElementById('arena-p1-card').classList.remove('answered');
+
+    document.getElementById('arena-p2-avatar').textContent = p2.avatar;
+    document.getElementById('arena-p2-name').textContent = p2.name;
+    document.getElementById('arena-p2-score').textContent = '0 pts';
+    document.getElementById('arena-p2-status').textContent = 'Waiting';
+    document.getElementById('arena-p2-status').className = 'player-status-badge';
+    document.getElementById('arena-p2-card').classList.remove('answered');
+
+    // Show ready countdown overlay
+    const overlay = document.getElementById('battle-start-overlay');
+    overlay.classList.remove('hidden');
+  });
+
+  socket.on('countdownTick', (count) => {
+    const numEl = document.getElementById('battle-countdown-num');
+    if (numEl) {
+      numEl.textContent = count > 0 ? count : 'GO! ⚔️';
+    }
+  });
+
+  socket.on('nextQuestion', ({ questionIndex, question, players }) => {
+    // Hide ready countdown overlay if visible
+    document.getElementById('battle-start-overlay').classList.add('hidden');
+
+    battleState.currentQuestionIndex = questionIndex;
+    battleState.answered = false;
+
+    // Hide explanation
+    document.getElementById('arena-explanation').classList.add('hidden');
+
+    // Reset scoreboards status
+    players.forEach(p => {
+      if (p.id === currentUser.id) {
+        document.getElementById('arena-p1-score').textContent = `${p.score * 10} pts`;
+        document.getElementById('arena-p1-status').textContent = 'Thinking...';
+        document.getElementById('arena-p1-status').className = 'player-status-badge thinking';
+        document.getElementById('arena-p1-card').classList.remove('answered');
+      } else {
+        document.getElementById('arena-p2-score').textContent = `${p.score * 10} pts`;
+        document.getElementById('arena-p2-status').textContent = 'Thinking...';
+        document.getElementById('arena-p2-status').className = 'player-status-badge thinking';
+        document.getElementById('arena-p2-card').classList.remove('answered');
+      }
+    });
+
+    // Render question
+    document.getElementById('arena-q-num').textContent = `Question ${questionIndex + 1} of ${battleState.questionsCount}`;
+
+    let qText = question.question;
+    if (currentLanguage === 'hi' && question.question_hi) qText = question.question_hi;
+    else if (currentLanguage === 'mr' && question.question_mr) qText = question.question_mr;
+    else if (currentLanguage === 'or' && question.question_or) qText = question.question_or;
+
+    document.getElementById('arena-q-text').textContent = qText;
+
+    // Render options
+    const options = [
+      { key: 'A', text: question.option_a },
+      { key: 'B', text: question.option_b },
+      { key: 'C', text: question.option_c },
+      { key: 'D', text: question.option_d }
+    ];
+
+    const optionsContainer = document.getElementById('arena-options');
+    optionsContainer.innerHTML = options.map(o => `
+      <button class="quiz-option" onclick="selectBattleAnswer('${o.key}')" data-key="${o.key}">
+        <span class="option-letter">${o.key}</span>
+        <span class="option-text">${o.text}</span>
+      </button>
+    `).join('');
+  });
+
+  socket.on('timerTick', (countdown) => {
+    document.getElementById('arena-timer-val').textContent = countdown;
+    const stroke = document.getElementById('battle-timer-stroke');
+    if (stroke) {
+      const pct = (countdown / 10) * 100;
+      stroke.setAttribute('stroke-dasharray', `${pct}, 100`);
+
+      if (countdown <= 3) {
+        stroke.style.stroke = '#FF6B6B';
+      } else {
+        stroke.style.stroke = 'var(--secondary)';
+      }
+    }
+  });
+
+  socket.on('playerAnswered', ({ playerId, playersStatus }) => {
+    const status = playersStatus.find(ps => ps.id === playerId);
+    if (status && status.answered) {
+      if (playerId === currentUser.id) {
+        document.getElementById('arena-p1-status').textContent = 'Answered!';
+        document.getElementById('arena-p1-status').className = 'player-status-badge submitted';
+        document.getElementById('arena-p1-card').classList.add('answered');
+      } else {
+        document.getElementById('arena-p2-status').textContent = 'Answered!';
+        document.getElementById('arena-p2-status').className = 'player-status-badge submitted';
+        document.getElementById('arena-p2-card').classList.add('answered');
+      }
+    }
+  });
+
+  socket.on('questionResult', ({ correctAnswer, explanation, players }) => {
+    // Show correct / incorrect highlights on options
+    document.querySelectorAll('#arena-options .quiz-option').forEach(btn => {
+      btn.classList.add('disabled');
+      const key = btn.dataset.key;
+      if (key === correctAnswer) {
+        btn.classList.add('selected-correct');
+      }
+    });
+
+    // Update scoreboard with results
+    players.forEach(p => {
+      const badgeId = p.id === currentUser.id ? 'arena-p1-status' : 'arena-p2-status';
+      const badgeEl = document.getElementById(badgeId);
+      const scoreId = p.id === currentUser.id ? 'arena-p1-score' : 'arena-p2-score';
+      const scoreEl = document.getElementById(scoreId);
+
+      scoreEl.textContent = `${p.score * 10} pts`;
+
+      if (p.answered) {
+        if (p.correct) {
+          badgeEl.textContent = '✅ Correct!';
+          badgeEl.className = 'player-status-badge correct';
+        } else {
+          badgeEl.textContent = '❌ Incorrect';
+          badgeEl.className = 'player-status-badge wrong';
+        }
+      } else {
+        badgeEl.textContent = '⏳ Timeout';
+        badgeEl.className = 'player-status-badge timeout';
+      }
+    });
+
+    // Display Explanation
+    if (explanation) {
+      document.getElementById('arena-exp-text').textContent = explanation;
+      document.getElementById('arena-explanation').classList.remove('hidden');
+    }
+  });
+
+  socket.on('battleFinished', ({ winnerId, loserId, p1, p2 }) => {
+    showScreen('quiz-battle-results');
+
+    const isWinner = winnerId === currentUser.id;
+    const isDraw = winnerId === null;
+
+    const emojiEl = document.getElementById('battle-result-emoji');
+    const titleEl = document.getElementById('battle-result-title');
+    const scoreEl = document.getElementById('battle-result-score');
+    const xpEl = document.getElementById('battle-result-xp');
+    const msgTitleEl = document.getElementById('battle-result-msg-title');
+    const msgBodyEl = document.getElementById('battle-result-msg-body');
+
+    const myPlayer = p1.id === currentUser.id ? p1 : p2;
+    const opponentPlayer = p1.id === currentUser.id ? p2 : p1;
+
+    scoreEl.textContent = `Your Score: ${myPlayer.score} vs Opponent: ${opponentPlayer.score}`;
+    xpEl.textContent = `+${myPlayer.xpEarned} XP`;
+
+    if (isWinner) {
+      emojiEl.textContent = '🏆';
+      titleEl.textContent = 'Victory! / जीत!';
+      titleEl.style.color = 'var(--secondary)';
+      msgTitleEl.textContent = 'Double XP Activated! ⚡';
+      msgBodyEl.textContent = `Spectacular performance! You defeated ${opponentPlayer.name} and earned a massive 2x XP bonus!`;
+    } else if (isDraw) {
+      emojiEl.textContent = '🤝';
+      titleEl.textContent = "It's a Draw! / मुकाबला बराबरी का!";
+      titleEl.style.color = 'var(--accent)';
+      msgTitleEl.textContent = 'Well played! 👏';
+      msgBodyEl.textContent = `A perfectly matched contest! You and ${opponentPlayer.name} finished with equal scores. Keep practicing to take the lead next time!`;
+    } else {
+      emojiEl.textContent = '💔';
+      titleEl.textContent = 'Defeat! / कोशिश जारी रखें!';
+      titleEl.style.color = '#FF6B6B';
+      msgTitleEl.textContent = 'Never Give Up! 🌱';
+      msgBodyEl.textContent = `Don't worry, failure is just a stepping stone to success! Practice makes perfect. Challenge ${opponentPlayer.name} to a rematch and try again!`;
+    }
+
+    // Refresh XP stats locally after a short delay
+    setTimeout(async () => {
+      try {
+        const profile = await api('/api/profile');
+        currentUser = profile;
+        updateNavStats();
+      } catch (e) {
+        console.error('Error refreshing profile after battle:', e);
+      }
+    }, 1000);
+  });
+
+  socket.on('rematchPrompt', ({ fromName }) => {
+    showToast(`⚔️ ${fromName} requested a rematch!`);
+  });
+
+  socket.on('opponentDisconnected', ({ message }) => {
+    showToast('⚠️ ' + message);
+    setTimeout(() => {
+      showScreen('home');
+    }, 4000);
+  });
+}
+
+function createBattleRoom() {
+  initSocket();
+  const subjectCode = document.getElementById('battle-subject').value;
+  socket.emit('createRoom', { subjectCode });
+  document.getElementById('battle-waiting-area').classList.remove('hidden');
+}
+
+function joinBattleRoom() {
+  initSocket();
+  const roomCode = document.getElementById('battle-room-code').value.trim();
+  if (roomCode.length !== 6 || isNaN(roomCode)) {
+    showToast('❌ Please enter a valid 6-digit room code');
+    return;
+  }
+  socket.emit('joinRoom', { roomCode });
+}
+
+function selectBattleAnswer(answerKey) {
+  if (battleState.answered) return;
+  battleState.answered = true;
+
+  document.querySelectorAll('#arena-options .quiz-option').forEach(btn => {
+    btn.classList.add('disabled');
+    if (btn.dataset.key === answerKey) {
+      btn.style.borderColor = 'var(--primary)';
+      btn.style.background = 'rgba(255, 107, 53, 0.1)';
+    }
+  });
+
+  socket.emit('submitAnswer', { answer: answerKey });
+}
+
+function rematchBattle() {
+  if (socket) {
+    socket.emit('requestRematch');
+    showToast('⏳ Rematch requested. Waiting for opponent...');
+  }
+}
+
+// ===== OFFLINE AI ON-DEVICE INTELLIGENCE IMPLEMENTATION =====
+
+let offlineDb = null;
+function initOfflineDB() {
+  return new Promise((resolve, reject) => {
+    if (offlineDb) return resolve(offlineDb);
+    
+    console.log("Initializing IndexedDB 'VidyaQuestOfflineDB'...");
+    const request = indexedDB.open('VidyaQuestOfflineDB', 1);
+    
+    request.onupgradeneeded = (e) => {
+      const db = e.target.result;
+      
+      if (!db.objectStoreNames.contains('lessons')) {
+        db.createObjectStore('lessons', { keyPath: 'id' });
+      }
+      
+      if (!db.objectStoreNames.contains('questions')) {
+        const qStore = db.createObjectStore('questions', { keyPath: 'id' });
+        qStore.createIndex('lesson_id', 'lesson_id', { unique: false });
+      }
+      
+      if (!db.objectStoreNames.contains('hints')) {
+        const hStore = db.createObjectStore('hints', { keyPath: 'id', autoIncrement: true });
+        hStore.createIndex('lesson_id', 'lesson_id', { unique: false });
+      }
+      
+      if (!db.objectStoreNames.contains('offline_progress')) {
+        db.createObjectStore('offline_progress', { keyPath: 'id', autoIncrement: true });
+      }
+    };
+    
+    request.onsuccess = (e) => {
+      offlineDb = e.target.result;
+      resolve(offlineDb);
+    };
+    
+    request.onerror = (e) => {
+      console.error('IndexedDB open error:', e.target.error);
+      reject(e.target.error);
+    };
+  });
+}
+
+function saveOfflineLesson(lesson, questions, hints) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const db = await initOfflineDB();
+      const transaction = db.transaction(['lessons', 'questions', 'hints'], 'readwrite');
+      
+      // Save lesson details
+      const lessonStore = transaction.objectStore('lessons');
+      lessonStore.put({
+        id: lesson.id,
+        subject_id: lesson.subject_id,
+        subject_name: lesson.subject_name,
+        subject_color: lesson.subject_color,
+        title: lesson.title,
+        title_hi: lesson.title_hi,
+        title_mr: lesson.title_mr,
+        title_or: lesson.title_or,
+        content: lesson.content,
+        grade: lesson.grade,
+        difficulty: lesson.difficulty,
+        xp_reward: lesson.xp_reward
+      });
+      
+      // Save questions
+      const questionStore = transaction.objectStore('questions');
+      questions.forEach(q => {
+        questionStore.put(q);
+      });
+      
+      // Clean old hints for this lesson to prevent duplicates
+      const hintStore = transaction.objectStore('hints');
+      const index = hintStore.index('lesson_id');
+      const request = index.openCursor(IDBKeyRange.only(lesson.id));
+      
+      request.onsuccess = (e) => {
+        const cursor = e.target.result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          // Write new hints
+          hints.forEach(h => {
+            h.lesson_id = lesson.id;
+            hintStore.add(h);
+          });
+        }
+      };
+      
+      transaction.oncomplete = () => {
+        resolve(true);
+      };
+      
+      transaction.onerror = (e) => {
+        reject(e.target.error);
+      };
+    } catch(err) {
+      reject(err);
+    }
+  });
+}
+
+function getOfflineLesson(lessonId) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const db = await initOfflineDB();
+      const transaction = db.transaction(['lessons', 'questions'], 'readonly');
+      
+      const lessonStore = transaction.objectStore('lessons');
+      const questionStore = transaction.objectStore('questions');
+      const index = questionStore.index('lesson_id');
+      
+      const lessonReq = lessonStore.get(lessonId);
+      const questionsReq = index.getAll(lessonId);
+      
+      transaction.oncomplete = () => {
+        const lesson = lessonReq.result;
+        if (lesson) {
+          lesson.questions = questionsReq.result || [];
+          resolve(lesson);
+        } else {
+          resolve(null);
+        }
+      };
+      
+      transaction.onerror = (e) => {
+        reject(e.target.error);
+      };
+    } catch(err) {
+      reject(err);
+    }
+  });
+}
+
+function checkIfLessonDownloaded(lessonId) {
+  return new Promise(async (resolve) => {
+    try {
+      const db = await initOfflineDB();
+      const transaction = db.transaction(['lessons'], 'readonly');
+      const store = transaction.objectStore('lessons');
+      const req = store.get(lessonId);
+      
+      req.onsuccess = () => {
+        resolve(!!req.result);
+      };
+      req.onerror = () => {
+        resolve(false);
+      };
+    } catch {
+      resolve(false);
+    }
+  });
+}
+
+async function downloadLessonOffline(lessonId) {
+  const btn = document.getElementById('btn-download-lesson');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = 'Downloading... ⏳';
+  }
+  
+  try {
+    // 1. Fetch lesson details & quiz questions
+    const lesson = await api('/api/lesson/' + lessonId);
+    
+    // 2. Fetch 50 adaptive hints
+    const hintData = await api('/api/offline/download-hints/' + lessonId);
+    
+    // 3. Save to Local IndexedDB Cache
+    await saveOfflineLesson(lesson, lesson.questions, hintData.hints);
+    
+    showToast('✅ Downloaded successfully! Offline AI active.');
+    if (btn) {
+      btn.textContent = 'Offline Ready ✅';
+      btn.style.background = 'rgba(78, 205, 196, 0.12)';
+      btn.style.color = 'var(--secondary)';
+      btn.style.borderColor = 'rgba(78, 205, 196, 0.3)';
+    }
+  } catch (err) {
+    console.error('Download offline error:', err);
+    showToast('❌ Download failed. Make sure you are online!');
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = 'Download Offline 📥';
+    }
+  }
+}
+
+function saveOfflineProgress(lessonId, score, total) {
+  return new Promise(async (resolve, reject) => {
+    try {
+      const db = await initOfflineDB();
+      const transaction = db.transaction(['offline_progress'], 'readwrite');
+      const store = transaction.objectStore('offline_progress');
+      store.add({
+        lessonId,
+        score,
+        total,
+        timestamp: new Date().toISOString()
+      });
+      transaction.oncomplete = () => {
+        resolve(true);
+      };
+      transaction.onerror = (e) => reject(e.target.error);
+    } catch(err) {
+      reject(err);
+    }
+  });
+}
+
+async function syncOfflineProgress() {
+  if (!navigator.onLine) return;
+  
+  try {
+    const db = await initOfflineDB();
+    const transaction = db.transaction(['offline_progress'], 'readonly');
+    const store = transaction.objectStore('offline_progress');
+    const getReq = store.getAll();
+    
+    getReq.onsuccess = async () => {
+      const records = getReq.result;
+      if (!records || records.length === 0) return;
+      
+      console.log(`Syncing ${records.length} offline quiz progress records...`);
+      showToast(`🔄 Syncing ${records.length} offline quiz results...`);
+      
+      for (const record of records) {
+        try {
+          // Post quiz result to DB
+          const result = await api('/api/quiz/submit', 'POST', {
+            lesson_id: record.lessonId,
+            score: record.score,
+            total: record.total
+          });
+          
+          if (currentUser) {
+            currentUser.xp = result.totalXP;
+            currentUser.level = Math.floor(result.totalXP / 200) + 1;
+            updateNavStats();
+          }
+          
+          // Re-download fresh AI hints tailored to the new performance scores!
+          await api('/api/offline/download-hints/' + record.lessonId).then(async (hintData) => {
+            const lesson = await getOfflineLesson(record.lessonId);
+            if (lesson) {
+              await saveOfflineLesson(lesson, lesson.questions, hintData.hints);
+              console.log(`Refreshed on-device AI hints for lesson ${record.lessonId} post-sync`);
+            }
+          }).catch(err => console.error("Error refreshing hints after sync:", err));
+          
+        } catch(e) {
+          console.error("Error syncing offline record:", e);
+        }
+      }
+      
+      // Clear offline progress queue
+      const deleteTransaction = db.transaction(['offline_progress'], 'readwrite');
+      const deleteStore = deleteTransaction.objectStore('offline_progress');
+      deleteStore.clear();
+      deleteTransaction.oncomplete = () => {
+        showToast('✅ Offline progress synced and AI hints updated!');
+      };
+    };
+  } catch (err) {
+    console.error('Offline progress sync error:', err);
+  }
+}
+
+async function displayOfflineHint() {
+  try {
+    const db = await initOfflineDB();
+    const lessonId = quizState.lessonId;
+    
+    const transaction = db.transaction(['hints'], 'readonly');
+    const store = transaction.objectStore('hints');
+    const index = store.index('lesson_id');
+    const request = index.getAll(lessonId);
+    
+    request.onsuccess = () => {
+      const hints = request.result;
+      if (hints && hints.length > 0) {
+        const currentQ = quizState.questions[quizState.current];
+        const qText = (currentQ.question || '').toLowerCase();
+        
+        // Find hint with matching tag in question text
+        let matchedHint = null;
+        for (const hint of hints) {
+          const tag = (hint.tag || '').toLowerCase();
+          if (tag && qText.includes(tag)) {
+            matchedHint = hint;
+            break;
+          }
+        }
+        
+        if (!matchedHint) {
+          matchedHint = hints[Math.floor(Math.random() * hints.length)];
+        }
+        
+        let hintText = matchedHint.hint_en;
+        if (currentLanguage === 'hi' && matchedHint.hint_hi) hintText = matchedHint.hint_hi;
+        else if (currentLanguage === 'mr' && matchedHint.hint_mr) hintText = matchedHint.hint_mr;
+        else if (currentLanguage === 'or' && matchedHint.hint_or) hintText = matchedHint.hint_or;
+        
+        const hintEl = document.getElementById('quiz-offline-hint');
+        if (hintEl) {
+          hintEl.innerHTML = `
+            <div class="hint-label">💡 On-Device AI Hint / ऑफ़लाइन एआई संकेत:</div>
+            <div class="hint-text">${hintText}</div>
+          `;
+          hintEl.style.display = 'block';
+        }
+      }
+    };
+  } catch (err) {
+    console.error("Error displaying offline hint:", err);
+  }
+}
+
+// Bind online sync handler
+window.addEventListener('online', syncOfflineProgress);
+// Trigger init on DOM load
+window.addEventListener('DOMContentLoaded', () => {
+  initOfflineDB().then(() => {
+    // Try to sync any pending progress on startup
+    if (navigator.onLine) {
+      setTimeout(syncOfflineProgress, 2000);
+    }
+  }).catch(err => console.error("Could not initialize Offline IndexedDB:", err));
+});
+
+
+// ============================================================
+// ===== SMART FOCUS MODE — Emotion & Engagement Tracker ======
+// ============================================================
+
+const SmartFocus = {
+  // --- State ---
+  active: false,
+  stream: null,
+  analysisInterval: null,
+  currentEmotion: 'neutral',
+  currentEngagement: 'medium',
+  consecutiveLowEngagement: 0,
+  consecutiveConfused: 0,
+  quizDifficultyLevel: 'normal',   // 'easy' | 'normal' | 'hard'
+  popupDismissed: false,
+  lastAnalysisTime: 0,
+  ANALYSIS_INTERVAL_MS: 20000,     // Analyse every 20 seconds
+  LOW_ENGAGEMENT_THRESHOLD: 3,     // 3 consecutive low readings before intervention
+  CONFUSED_THRESHOLD: 2,
+
+  // --- Offline Local Tracking State ---
+  localInterval: null,
+  cascadeLoaded: false,
+  classifyRegion: null,
+  faceCenterHistory: [],
+  calibratedCenter: null,
+  noFaceCounter: 0,
+  turnCounter: 0,
+  slouchCounter: 0,
+  lastOnlineAnalysisTime: 0,       // Timestamp of last online API result
+  lastTriggeredEmotion: null,      // Tracks last triggered logic emotion to prevent spam
+
+  // Emoji map for emotion badge
+  EMOTION_EMOJI: {
+    focused: '🎯', happy: '😊', confused: '🤔',
+    frustrated: '😤', bored: '😴', distracted: '👀', neutral: '😐'
+  },
+
+  // Intervention messages (cycling through to avoid repetition)
+  INTERVENTIONS: {
+    bored: [
+      { icon: '🎮', title: 'Wake-up Challenge!', body: 'You look a little sleepy. Try this mental math: What is 17 × 8? Work it out in your head!' },
+      { icon: '🌍', title: 'Cool Science Fact!', body: 'Did you know? A bolt of lightning is 5× hotter than the surface of the Sun! 🌩️ Think about why electricity is so powerful.' },
+      { icon: '🤸', title: 'Stretch Break!', body: 'Roll your shoulders 3 times backward, then 3 times forward. Then take a deep breath. Ready to learn again? 💪' },
+    ],
+    distracted: [
+      { icon: '🎯', title: 'Refocus Time!', body: 'Your attention has wandered — that\'s totally normal! Try closing other tabs and reading just ONE more section before a break.' },
+      { icon: '🔍', title: 'Curiosity Challenge!', body: 'Think of ONE question about what you\'re studying right now. Got it? That curiosity is your superpower!' },
+      { icon: '⏱️', title: 'Pomodoro Boost!', body: 'Set a 5-minute focus sprint — read deeply for just 5 minutes, then take a 1-minute break. You can do this!' },
+    ],
+    confused: [
+      { icon: '💡', title: 'Need a Hint?', body: 'It\'s OK to be confused — that means you\'re learning something new! Try re-reading the last paragraph or check the Hint in your quiz.' },
+      { icon: '🗺️', title: 'Let\'s Simplify!', body: 'Break the problem into smaller pieces. What is the first small thing you need to understand? Start there.' },
+    ],
+    frustrated: [
+      { icon: '🌊', title: 'Take a Breath!', body: 'It looks like you\'re frustrated — that\'s a sign you care! Take 3 slow deep breaths, then try the problem from a different angle.' },
+      { icon: '🏆', title: 'You\'ve Got This!', body: 'Every expert was once a beginner. The fact that this is hard means you\'re growing. Keep going — you\'re closer than you think!' },
+    ],
+  },
+
+  _interventionIndex: { bored: 0, distracted: 0, confused: 0, frustrated: 0 },
+
+  // --- Init: start camera stream ---
+  async startCamera() {
+    // 1. Secure context check
+    if (window.isSecureContext === false || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      console.warn('[SmartFocus] Insecure Context or mediaDevices API missing.');
+      this.showTroubleshootModal('INSECURE_CONTEXT');
+      return false;
+    }
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 320 }, height: { ideal: 240 }, facingMode: 'user' },
+        audio: false,
+      });
+      const video = document.getElementById('focus-camera-feed');
+      video.srcObject = this.stream;
+      await video.play();
+      return true;
+    } catch (err) {
+      console.error('[SmartFocus] Camera error:', err);
+      this.showTroubleshootModal(err.name || 'GenericError');
+      return false;
+    }
+  },
+
+  // --- Stop camera stream ---
+  stopCamera() {
+    if (this.stream) {
+      this.stream.getTracks().forEach(t => t.stop());
+      this.stream = null;
+    }
+    const video = document.getElementById('focus-camera-feed');
+    if (video) video.srcObject = null;
+  },
+
+  // --- Capture a frame as base64 JPEG ---
+  captureFrame() {
+    const video = document.getElementById('focus-camera-feed');
+    const canvas = document.getElementById('focus-camera-canvas');
+    if (!video || !canvas || !video.videoWidth) return null;
+    const ctx = canvas.getContext('2d');
+    // Flip horizontally to match mirror display
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+    return canvas.toDataURL('image/jpeg', 0.7);
+  },
+
+  // --- Send frame to API and get emotion back ---
+  async analyseFrame() {
+    if (!this.active || !currentToken) return;
+    if (!navigator.onLine) {
+      this.setStatus('active', 'Focus AI (Offline) 🧠');
+      return;
+    }
+    const now = Date.now();
+    if (now - this.lastAnalysisTime < this.ANALYSIS_INTERVAL_MS) return;
+    this.lastAnalysisTime = now;
+
+    const imageBase64 = this.captureFrame();
+    if (!imageBase64) return;
+
+    this.setStatus('analysing', 'Analysing...');
+    try {
+      const response = await fetch('/api/emotion/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${currentToken}` },
+        body: JSON.stringify({ imageBase64 }),
+      });
+      if (!response.ok) throw new Error(`API ${response.status}`);
+      const data = await response.json();
+      this.onEmotionResult(data);
+    } catch (err) {
+      console.error('[SmartFocus] analyse error:', err.message);
+      this.setStatus('idle', 'Reconnecting...');
+    }
+  },
+
+  // --- Load local facefinder cascade model ---
+  async loadCascade() {
+    if (this.cascadeLoaded) return true;
+    try {
+      this.setStatus('warning', 'Loading Offline AI...');
+      const response = await fetch('/js/facefinder');
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      const bytes = new Int8Array(buffer);
+      this.classifyRegion = pico.unpack_cascade(bytes);
+      this.cascadeLoaded = true;
+      console.log('[SmartFocus] Local Pico.js facefinder cascade loaded.');
+      return true;
+    } catch (err) {
+      console.error('[SmartFocus] Error loading facefinder cascade:', err);
+      return false;
+    }
+  },
+
+  // --- Run Local Offline-first Tracking tick (1Hz) ---
+  runLocalTrackingTick() {
+    const video = document.getElementById('focus-camera-feed');
+    const canvas = document.getElementById('focus-camera-canvas');
+    if (!video || !canvas || !video.videoWidth || !this.classifyRegion) return;
+
+    const ctx = canvas.getContext('2d');
+    // Mirror draw to match local video feedback
+    ctx.save();
+    ctx.scale(-1, 1);
+    ctx.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+    ctx.restore();
+
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const nrows = canvas.height;
+    const ncols = canvas.width;
+
+    // Convert RGBA to Grayscale
+    const pixels = new Uint8Array(nrows * ncols);
+    const rgba = imgData.data;
+    for (let i = 0; i < nrows * ncols; ++i) {
+      pixels[i] = (299 * rgba[4 * i] + 587 * rgba[4 * i + 1] + 114 * rgba[4 * i + 2]) / 1000;
+    }
+
+    const image = {
+      pixels: pixels,
+      nrows: nrows,
+      ncols: ncols,
+      ldim: ncols
+    };
+
+    const params = {
+      shiftfactor: 0.1,
+      minsize: 50,
+      maxsize: 150,
+      scalefactor: 1.1
+    };
+
+    let detections = pico.run_cascade(image, this.classifyRegion, params);
+    detections = pico.cluster_detections(detections, 0.2);
+
+    // q > 4.0 is face detection confidence threshold
+    const face = detections.find(d => d[3] > 4.0);
+    this.processLocalFaceDetection(face, canvas.width, canvas.height);
+  },
+
+  // --- Run offline geometry heuristics ---
+  processLocalFaceDetection(face, width, height) {
+    let currentEmotion = 'focused';
+    let currentEngagement = 'high';
+    let explanation = '🎯 Focused and centered';
+
+    if (!face) {
+      this.noFaceCounter++;
+      this.slouchCounter = 0;
+      this.turnCounter = 0;
+
+      if (this.noFaceCounter >= 3) {
+        currentEmotion = 'distracted';
+        currentEngagement = 'low';
+        explanation = '👀 Face missing (looking away)';
+      } else {
+        currentEmotion = this.currentEmotion;
+        currentEngagement = this.currentEngagement;
+        explanation = 'Searching for face...';
+      }
+    } else {
+      this.noFaceCounter = 0;
+      const [y, x, s, q] = face;
+
+      // Keep running center point history
+      this.faceCenterHistory.push({ x, y, s });
+      if (this.faceCenterHistory.length > 8) {
+        this.faceCenterHistory.shift();
+      }
+
+      let avgX = 0, avgY = 0, avgS = 0;
+      this.faceCenterHistory.forEach(p => { avgX += p.x; avgY += p.y; avgS += p.s; });
+      avgX /= this.faceCenterHistory.length;
+      avgY /= this.faceCenterHistory.length;
+      avgS /= this.faceCenterHistory.length;
+
+      // First few ticks are used to calibrate baseline
+      if (!this.calibratedCenter) {
+        if (this.faceCenterHistory.length >= 4) {
+          this.calibratedCenter = { x: avgX, y: avgY, s: avgS };
+          console.log('[SmartFocus] Baseline calibrated:', this.calibratedCenter);
+        }
+        this.updateLocalUI('focused', 'high', '🧠 Calibrating Baseline...');
+        return;
+      }
+
+      const xDiff = Math.abs(x - this.calibratedCenter.x);
+      const yDiff = y - this.calibratedCenter.y;
+
+      const xThreshold = width * 0.16; // 16% horizontal deviation
+      const yThreshold = height * 0.18; // 18% vertical drop
+
+      if (xDiff > xThreshold) {
+        this.turnCounter++;
+      } else {
+        this.turnCounter = Math.max(0, this.turnCounter - 1);
+      }
+
+      if (yDiff > yThreshold) {
+        this.slouchCounter++;
+      } else {
+        this.slouchCounter = Math.max(0, this.slouchCounter - 1);
+      }
+
+      if (this.turnCounter >= 3) {
+        currentEmotion = 'distracted';
+        currentEngagement = 'low';
+        explanation = '👀 Gaze diverted (looking side)';
+      } else if (this.slouchCounter >= 4) {
+        currentEmotion = 'bored';
+        currentEngagement = 'low';
+        explanation = '😴 Slouching or drowsiness detected';
+      } else {
+        // Face is present and centered!
+        // If we are online and have a fresh online AI result (less than 25s ago), preserve it!
+        const timeSinceOnline = Date.now() - this.lastOnlineAnalysisTime;
+        if (navigator.onLine && timeSinceOnline < 25000 && this.currentEmotion && this.currentEmotion !== 'distracted' && this.currentEmotion !== 'bored') {
+          currentEmotion = this.currentEmotion;
+          currentEngagement = this.currentEngagement;
+          explanation = '🧠 Focus AI tracking active';
+        } else {
+          currentEmotion = 'focused';
+          currentEngagement = 'high';
+          explanation = '🎯 Attentive';
+        }
+      }
+    }
+
+    // 1. Update UI dot and badge immediately for smooth, responsive feedback
+    this.updateLocalUI(currentEmotion, currentEngagement, explanation);
+
+    // 2. Direct transition-based adaptation (rate-limited/deduplicated)
+    if (currentEmotion === 'distracted' || currentEmotion === 'bored') {
+      if (this.lastTriggeredEmotion !== currentEmotion) {
+        this.lastTriggeredEmotion = currentEmotion;
+        console.log(`[SmartFocus] Stable physical event detected: ${currentEmotion}. Triggering adaptation.`);
+        this.applyAdaptiveLogic(currentEmotion, currentEngagement);
+      }
+    } else {
+      // Recovered/Stable centered state
+      if (this.lastTriggeredEmotion) {
+        console.log('[SmartFocus] Student returned to focus. Resetting trigger locks.');
+        this.lastTriggeredEmotion = null;
+        // Revert game engine difficulty to normal if they were in a bad state
+        this.applyAdaptiveLogic(currentEmotion, currentEngagement);
+      }
+    }
+  },
+
+  // --- Real-time Local UI updates ---
+  updateLocalUI(emotion, engagement, explanation) {
+    const badge = document.getElementById('sf-emotion-badge');
+    if (badge) {
+      const emoji = this.EMOTION_EMOJI[emotion] || '😐';
+      const label = navigator.onLine ? emotion : `${emotion} (Offline)`;
+      badge.textContent = `${emoji} ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+      badge.className = `sf-emotion-badge ${emotion}`;
+    }
+
+    const dotClass = engagement === 'high' ? 'active' : engagement === 'medium' ? 'warning' : 'alert';
+    const dot = document.getElementById('sf-status-dot');
+    const statusText = document.getElementById('sf-status-text');
+    if (dot) {
+      dot.className = `sf-status-dot ${dotClass}`;
+    }
+    if (statusText) statusText.textContent = explanation;
+  },
+
+
+  // --- Handle analysis result ---
+  onEmotionResult(data) {
+    const { emotion, engagement, explanation } = data;
+    this.currentEmotion = emotion;
+    this.currentEngagement = engagement;
+    if (navigator.onLine) {
+      this.lastOnlineAnalysisTime = Date.now();
+    }
+
+    // Update badge
+    const badge = document.getElementById('sf-emotion-badge');
+    if (badge) {
+      const emoji = this.EMOTION_EMOJI[emotion] || '😐';
+      badge.textContent = `${emoji} ${emotion.charAt(0).toUpperCase() + emotion.slice(1)}`;
+      badge.className = `sf-emotion-badge ${emotion}`;
+    }
+
+    // Set status dot
+    const dotClass = engagement === 'high' ? 'active' : engagement === 'medium' ? 'warning' : 'alert';
+    this.setStatus(dotClass, explanation || emotion);
+
+    // Adaptive logic
+    this.applyAdaptiveLogic(emotion, engagement);
+  },
+
+  // --- Core adaptive logic ---
+  applyAdaptiveLogic(emotion, engagement) {
+    const lowEngaged = engagement === 'low';
+    const highEngaged = engagement === 'high';
+
+    if (lowEngaged) {
+      this.consecutiveLowEngagement++;
+    } else {
+      this.consecutiveLowEngagement = Math.max(0, this.consecutiveLowEngagement - 1);
+    }
+
+    if (emotion === 'confused' || emotion === 'frustrated') {
+      this.consecutiveConfused++;
+    } else {
+      this.consecutiveConfused = Math.max(0, this.consecutiveConfused - 1);
+    }
+
+    // Calm pulse overlay for frustrated/distracted
+    if (emotion === 'frustrated' || emotion === 'distracted') {
+      document.body.classList.add('sf-calm-pulse');
+      setTimeout(() => document.body.classList.remove('sf-calm-pulse'), 6000);
+    }
+
+    // Difficulty adaptation
+    if (this.consecutiveConfused >= this.CONFUSED_THRESHOLD && this.quizDifficultyLevel !== 'easy') {
+      this.quizDifficultyLevel = 'easy';
+      this.showAdaptiveBanner('easier', '🧩 Switching to easier questions — take your time!');
+    } else if (highEngaged && emotion === 'focused' && this.quizDifficultyLevel !== 'hard') {
+      this.quizDifficultyLevel = 'hard';
+      this.showAdaptiveBanner('harder', '🚀 You\'re on fire! Levelling up the challenge!');
+    } else if (highEngaged && this.quizDifficultyLevel === 'easy') {
+      this.quizDifficultyLevel = 'normal';
+      this.showAdaptiveBanner('focus', '✅ Back to standard difficulty — great recovery!');
+    }
+
+    // Engagement intervention popup (bored/distracted/frustrated/confused)
+    if (this.consecutiveLowEngagement >= this.LOW_ENGAGEMENT_THRESHOLD && !this.popupDismissed) {
+      this.triggerIntervention(emotion);
+      this.consecutiveLowEngagement = 0;
+    } else if (this.consecutiveConfused >= this.CONFUSED_THRESHOLD && !this.popupDismissed) {
+      this.triggerIntervention(emotion);
+      this.consecutiveConfused = 0;
+    }
+  },
+
+  // --- Show intervention popup ---
+  triggerIntervention(emotion) {
+    const category = ['bored','distracted','confused','frustrated'].includes(emotion) ? emotion : 'distracted';
+    const messages = this.INTERVENTIONS[category];
+    if (!messages) return;
+
+    const idx = this._interventionIndex[category] % messages.length;
+    this._interventionIndex[category]++;
+    const msg = messages[idx];
+
+    document.getElementById('sf-popup-icon').textContent = msg.icon;
+    document.getElementById('sf-popup-title').textContent = msg.title;
+    document.getElementById('sf-popup-body').textContent = msg.body;
+    document.getElementById('sf-engagement-popup').classList.remove('sf-hidden');
+
+    // Auto-dismiss after 15s
+    setTimeout(() => this.dismissEngagementPopup(), 15000);
+  },
+
+  dismissEngagementPopup() {
+    document.getElementById('sf-engagement-popup').classList.add('sf-hidden');
+    this.popupDismissed = true;
+    // Allow new popups after 2 minutes
+    setTimeout(() => { this.popupDismissed = false; }, 120000);
+  },
+
+  // --- Show adaptive difficulty banner ---
+  showAdaptiveBanner(type, message) {
+    const quizContainer = document.getElementById('quiz-screen') || document.getElementById('screen-home');
+    if (!quizContainer) return;
+
+    const existing = document.getElementById('sf-adaptive-banner');
+    if (existing) existing.remove();
+
+    const banner = document.createElement('div');
+    banner.id = 'sf-adaptive-banner';
+    banner.className = `sf-adaptive-banner ${type}`;
+    banner.textContent = message;
+
+    quizContainer.insertAdjacentElement('afterbegin', banner);
+    setTimeout(() => banner.remove(), 5000);
+  },
+
+  // --- Update status indicator in widget ---
+  setStatus(dotClass, text) {
+    const dot = document.getElementById('sf-status-dot');
+    const statusText = document.getElementById('sf-status-text');
+    if (dot) {
+      dot.className = `sf-status-dot ${dotClass === 'analysing' ? 'warning' : dotClass === 'idle' ? '' : dotClass}`;
+    }
+    if (statusText) statusText.textContent = text;
+  },
+
+  // --- Start continuous analysis loop ---
+  startLoop() {
+    this.analysisInterval = setInterval(() => this.analyseFrame(), this.ANALYSIS_INTERVAL_MS);
+    this.localInterval = setInterval(() => this.runLocalTrackingTick(), 1000);
+    // Run first analysis after a 5s warm-up
+    setTimeout(() => this.analyseFrame(), 5000);
+  },
+
+  stopLoop() {
+    if (this.analysisInterval) {
+      clearInterval(this.analysisInterval);
+      this.analysisInterval = null;
+    }
+    if (this.localInterval) {
+      clearInterval(this.localInterval);
+      this.localInterval = null;
+    }
+  },
+
+  // --- Full start ---
+  async start() {
+    const loaded = await this.loadCascade();
+    if (!loaded) {
+      showToast('⚠️ Could not initialize offline tracker cascade model.', 4000);
+    }
+    const started = await this.startCamera();
+    if (!started) return false;
+    this.active = true;
+    this.consecutiveLowEngagement = 0;
+    this.consecutiveConfused = 0;
+    this.quizDifficultyLevel = 'normal';
+    this.popupDismissed = false;
+    this.lastAnalysisTime = 0; // reset so first analysis fires immediately
+
+    // Reset local tracking values
+    this.faceCenterHistory = [];
+    this.calibratedCenter = null;
+    this.noFaceCounter = 0;
+    this.turnCounter = 0;
+    this.slouchCounter = 0;
+    this.localStatesBuffer = [];
+
+    document.getElementById('smart-focus-widget').classList.remove('sf-hidden');
+    this.setStatus('active', 'Focus AI active 🧠');
+    this.startLoop();
+    return true;
+  },
+
+  // --- Full stop ---
+  stop() {
+    this.active = false;
+    this.stopLoop();
+    this.stopCamera();
+    document.getElementById('smart-focus-widget').classList.add('sf-hidden');
+    document.getElementById('sf-engagement-popup').classList.add('sf-hidden');
+    document.body.classList.remove('sf-calm-pulse');
+    const badge = document.getElementById('sf-emotion-badge');
+    if (badge) { badge.textContent = '😊 Ready'; badge.className = 'sf-emotion-badge'; }
+  },
+
+  // --- Get current difficulty for quiz question filtering ---
+  getDifficultyFilter() {
+    return this.quizDifficultyLevel; // 'easy' | 'normal' | 'hard'
+  },
+
+  // --- Show Troubleshoot Modal with step-by-step guidance ---
+  showTroubleshootModal(errorType) {
+    const modal = document.getElementById('sf-troubleshoot-modal');
+    if (!modal) return;
+    
+    const errCodeEl = document.getElementById('sf-error-code');
+    const contentEl = document.getElementById('sf-troubleshoot-content');
+    
+    let errCode = 'UNKNOWN_ERROR';
+    let contentHtml = '';
+    
+    const currentOrigin = window.location.origin;
+    
+    if (errorType === 'INSECURE_CONTEXT') {
+      errCode = 'INSECURE_CONTEXT';
+      contentHtml = `
+        <div class="sf-alert-danger">
+          <strong>⚠️ Insecure Connection:</strong> Browsers restrict camera usage to secure contexts (HTTPS or localhost). Since you are accessing via <code>${window.location.hostname}</code> on an unencrypted HTTP link, camera access is disabled by security rules.
+        </div>
+        <h3>How to fix this:</h3>
+        <ul class="sf-troubleshoot-steps">
+          <li data-step="1"><strong>Access locally:</strong> If you are on the same machine running the server, open <a href="http://localhost:3000" style="color:var(--secondary); text-decoration:underline;">http://localhost:3000</a> instead.</li>
+          <li data-step="2"><strong>Enable Chrome bypass flag:</strong> If accessing from another device (like a phone or tablet in the classroom):
+            <div style="margin: 8px 0 4px 0;">a. Open a new tab in Chrome/Edge and go to:</div>
+            <div class="sf-code-block">
+              <span style="user-select: all;">chrome://flags/#unsafely-treat-insecure-origin-as-secure</span>
+              <button class="sf-copy-btn" onclick="SmartFocus.copyText('chrome://flags/#unsafely-treat-insecure-origin-as-secure')">Copy</button>
+            </div>
+            <div style="margin: 6px 0 4px 0;">b. Enable the flag, and paste this URL into the text box:</div>
+            <div class="sf-code-block">
+              <span style="user-select: all;">${currentOrigin}</span>
+              <button class="sf-copy-btn" onclick="SmartFocus.copyText('${currentOrigin}')">Copy</button>
+            </div>
+            <div style="margin-top: 4px;">c. Click <strong>Relaunch</strong> at the bottom of Chrome.</div>
+          </li>
+          <li data-step="3"><strong>Enable HTTPS:</strong> You can place <code>key.pem</code> and <code>cert.pem</code> certificate files in the project root to enable secure HTTPS connections.</li>
+        </ul>
+      `;
+    } else if (errorType === 'NotAllowedError') {
+      errCode = 'PERMISSION_DENIED';
+      contentHtml = `
+        <div class="sf-alert-danger">
+          <strong>⚠️ Permission Blocked:</strong> You previously blocked camera access for this site, or clicked "Block" on the prompt.
+        </div>
+        <h3>How to allow access:</h3>
+        <ul class="sf-troubleshoot-steps">
+          <li data-step="1"><strong>Click the settings/lock icon:</strong> Locate the lock or camera icon on the left side of your browser's address bar (next to the URL).</li>
+          <li data-step="2"><strong>Enable Camera:</strong> Look for the <strong>Camera</strong> toggle/permission settings and switch it to <strong>Allow</strong>.</li>
+          <li data-step="3"><strong>Refresh the page:</strong> Click the "Refresh & Retry" button below to reload and test the camera again.</li>
+        </ul>
+      `;
+    } else if (errorType === 'NotFoundError' || errorType === 'DevicesNotFoundError') {
+      errCode = 'HARDWARE_MISSING';
+      contentHtml = `
+        <div class="sf-alert-danger">
+          <strong>⚠️ Webcam Not Found:</strong> The browser could not detect any camera hardware connected to your device.
+        </div>
+        <h3>Checklist:</h3>
+        <ul class="sf-troubleshoot-steps">
+          <li data-step="1"><strong>Plugs & Cables:</strong> If you use an external USB webcam, ensure it is securely plugged in.</li>
+          <li data-step="2"><strong>Hardware Switch:</strong> Check if your laptop has a physical webcam slider cover or keyboard shortcut (like Fn + F6/F10) that disables the camera.</li>
+          <li data-step="3"><strong>Driver Settings:</strong> Ensure your webcam is enabled in your OS Device Manager settings.</li>
+        </ul>
+      `;
+    } else if (errorType === 'NotReadableError' || errorType === 'TrackStartError') {
+      errCode = 'DEVICE_BUSY';
+      contentHtml = `
+        <div class="sf-alert-danger">
+          <strong>⚠️ Camera Busy:</strong> Another application or browser tab is already using your camera.
+        </div>
+        <h3>Steps to resolve:</h3>
+        <ul class="sf-troubleshoot-steps">
+          <li data-step="1"><strong>Close Other Tabs:</strong> Make sure no other browser tabs (like Google Meet, Zoom, or school portals) are open.</li>
+          <li data-step="2"><strong>Close Desktop Apps:</strong> Check if Teams, Skype, Discord, Zoom, or your camera app are running in the background.</li>
+          <li data-step="3"><strong>Restart Device:</strong> If the camera remains locked, a quick device restart will release the hardware.</li>
+        </ul>
+      `;
+    } else {
+      errCode = errorType || 'GENERIC_ACCESS_ERROR';
+      contentHtml = `
+        <div class="sf-alert-danger">
+          <strong>⚠️ Access Failed:</strong> Could not initialize camera. Reason: <code>${errorType || 'Unknown Device Error'}</code>
+        </div>
+        <h3>General Troubleshooting:</h3>
+        <ul class="sf-troubleshoot-steps">
+          <li data-step="1">Make sure you have an active camera and it isn't blocked by antivirus/privacy guard software.</li>
+          <li data-step="2">Ensure you are using a modern browser like Google Chrome, Microsoft Edge, or Firefox.</li>
+          <li data-step="3">Try reloading the page or testing in a private/incognito window.</li>
+        </ul>
+      `;
+    }
+    
+    errCodeEl.textContent = `Error Code: ${errCode}`;
+    contentEl.innerHTML = contentHtml;
+    modal.classList.remove('sf-hidden');
+  },
+
+  // --- Copy utility for troubleshoot codes ---
+  copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('📋 Copied to clipboard!');
+    }).catch(err => {
+      console.error('Failed to copy text:', err);
+      // Fallback copy using temporary element
+      try {
+        const el = document.createElement('textarea');
+        el.value = text;
+        document.body.appendChild(el);
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+        showToast('📋 Copied to clipboard!');
+      } catch (e) {
+        showToast('❌ Copy failed. Please select and copy manually.');
+      }
+    });
+  },
+};
+
+// ===== GLOBAL HANDLER: Toggle from UI =====
+function onSmartFocusToggle(enabled) {
+  if (enabled) {
+    // Show consent modal first (remove sf-hidden)
+    document.getElementById('smart-focus-modal').classList.remove('sf-hidden');
+  } else {
+    SmartFocus.stop();
+    showToast('Smart Focus Mode turned off.');
+  }
+}
+
+function confirmSmartFocus() {
+  document.getElementById('smart-focus-modal').classList.add('sf-hidden');
+  SmartFocus.start().then(ok => {
+    if (ok) {
+      showToast('🧠 Smart Focus Mode ON — AI is now adapting to you!', 3000);
+    } else {
+      // Revert toggle
+      const toggle = document.getElementById('smart-focus-toggle');
+      if (toggle) toggle.checked = false;
+    }
+  });
+}
+
+function cancelSmartFocus() {
+  document.getElementById('smart-focus-modal').classList.add('sf-hidden');
+  const toggle = document.getElementById('smart-focus-toggle');
+  if (toggle) toggle.checked = false;
+}
+
+function toggleSmartFocusWidget() {
+  const widget = document.getElementById('smart-focus-widget');
+  const btn = widget.querySelector('.sf-minimize-btn');
+  if (widget.classList.toggle('minimised')) {
+    btn.textContent = '⟩';
+  } else {
+    btn.textContent = '⟨';
+  }
+}
+
+function dismissEngagementPopup() {
+  SmartFocus.dismissEngagementPopup();
+}
+

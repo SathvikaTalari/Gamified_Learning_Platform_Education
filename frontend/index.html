@@ -398,6 +398,17 @@
             <h2 id="home-greeting">Good Morning! 🌅</h2>
             <p id="home-username">Welcome back, Arjun!</p>
           </div>
+          <!-- Smart Focus Mode Toggle -->
+          <div class="smart-focus-toggle-wrap" title="Smart Focus Mode: AI watches your expressions to personalise difficulty">
+            <div class="smart-focus-toggle-label">
+              <span class="sf-icon">🧠</span>
+              <span class="sf-text">Focus AI</span>
+            </div>
+            <label class="sf-switch" id="smart-focus-switch-label">
+              <input type="checkbox" id="smart-focus-toggle" onchange="onSmartFocusToggle(this.checked)">
+              <span class="sf-slider"></span>
+            </label>
+          </div>
           <div class="daily-streak-box">
             <div class="streak-fire">🔥</div>
             <div class="streak-count"><span id="home-streak">0</span></div>
@@ -418,6 +429,14 @@
         <div class="dashboard-grid">
           <!-- Left Column -->
           <div class="dash-col">
+            <div class="dash-card battle-dash-card" style="border-left: 4px solid var(--primary); background: linear-gradient(135deg, rgba(255, 107, 53, 0.08), rgba(123, 104, 238, 0.08));">
+              <h3 class="dash-title" style="color: var(--primary);">⚔️ Live Quiz Battle</h3>
+              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;">Challenge your classmates to a real-time STEM quiz battle and earn 2x XP! / क्लासमेट को चुनौती दें!</p>
+              <button class="btn-primary" onclick="showScreen('quiz-battle-lobby')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                Challenge a Friend ⚔️
+              </button>
+            </div>
+
             <div class="dash-card">
               <h3 class="dash-title">📊 Weekly XP Progress</h3>
               <div class="chart-container">
@@ -508,6 +527,141 @@
       <!-- PROFILE -->
       <div id="screen-profile" class="inner-screen">
         <div id="profile-content"></div>
+      </div>
+
+      <!-- QUIZ BATTLE LOBBY -->
+      <div id="screen-quiz-battle-lobby" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('home')">← Back / पीछे</button>
+        <h2 class="screen-title">⚔️ Quiz Battle Arena / क्विज़ बैटल</h2>
+        <p class="screen-subtitle">Challenge classmates in real-time quiz duels / क्लासमेट्स को लाइव चुनौती दें!</p>
+        
+        <div class="dashboard-grid">
+          <!-- Create Room -->
+          <div class="dash-card">
+            <h3 class="dash-title">🆕 Create Battle Arena</h3>
+            <div class="form-group" style="margin-bottom:15px;">
+              <label class="form-label">Choose Subject / विषय चुनें</label>
+              <select id="battle-subject" class="form-control">
+                <option value="any">Any Subject / सभी विषय</option>
+                <option value="math">🔢 Mathematics / गणित</option>
+                <option value="science">🔬 Science / विज्ञान</option>
+                <option value="tech">💻 Technology / तकनीकी</option>
+                <option value="eng">⚙️ Engineering / इंजीनियरिंग</option>
+              </select>
+            </div>
+            <button class="btn-primary" style="width:100%;" onclick="createBattleRoom()">Create Battle Room ⚔️</button>
+          </div>
+
+          <!-- Join Room -->
+          <div class="dash-card">
+            <h3 class="dash-title">🚪 Join Arena</h3>
+            <div class="form-group" style="margin-bottom:15px;">
+              <label class="form-label">Enter 6-Digit Code / कोड दर्ज करें</label>
+              <input type="text" id="battle-room-code" class="form-control" placeholder="e.g. 123456" maxlength="6" style="text-align:center; font-size:1.5rem; letter-spacing:4px; font-weight:700;">
+            </div>
+            <button class="btn-secondary" style="width:100%; border-color:var(--secondary); color:var(--secondary); font-family:'Baloo 2', cursive;" onclick="joinBattleRoom()">Join Room 🚪</button>
+          </div>
+        </div>
+
+        <!-- Waiting Lobby (Initially Hidden) -->
+        <div id="battle-waiting-area" class="dash-card hidden" style="margin-top:20px; text-align:center; padding:30px;">
+          <h3 class="dash-title" style="justify-content:center;">Waiting for Opponent / प्रतिद्वंद्वी का इंतज़ार</h3>
+          <div class="room-code-display" style="font-size:2.5rem; font-weight:800; color:var(--primary); margin:20px 0; letter-spacing:4px;" id="waiting-room-code">------</div>
+          <p style="color:var(--text2); margin-bottom:20px;">Share this code with your classmate to start the battle!</p>
+          <div style="display:flex; justify-content:center; gap:20px; align-items:center;">
+            <div class="player-lobby-card">
+              <div class="player-lobby-avatar" id="lobby-p1-avatar">🧑‍🎓</div>
+              <div class="player-lobby-name" id="lobby-p1-name">You</div>
+            </div>
+            <div style="font-size:1.5rem; font-weight:700; color:var(--text3);">VS</div>
+            <div class="player-lobby-card">
+              <div class="player-lobby-avatar" style="border: 2px dashed var(--border); opacity:0.5; background:transparent; width: 60px; height: 60px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 2rem;" id="lobby-p2-avatar">❓</div>
+              <div class="player-lobby-name" style="color:var(--text3);" id="lobby-p2-name">Waiting...</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- QUIZ BATTLE ARENA -->
+      <div id="screen-quiz-battle-arena" class="inner-screen">
+        <!-- Battle Scoreboard (Split Screen layout) -->
+        <div class="battle-scoreboard-wrap">
+          <!-- Player 1 Score (Left) -->
+          <div class="player-score-card p1-card" id="arena-p1-card">
+            <div class="player-score-avatar" id="arena-p1-avatar">🧑‍🎓</div>
+            <div class="player-score-info">
+              <div class="player-score-name" id="arena-p1-name">You</div>
+              <div class="player-score-points" id="arena-p1-score">0 pts</div>
+            </div>
+            <div class="player-status-badge" id="arena-p1-status">Waiting</div>
+          </div>
+
+          <!-- Center Timer -->
+          <div class="battle-timer-wrap">
+            <div class="battle-timer-circle">
+              <svg class="timer-svg" viewBox="0 0 36 36">
+                <path class="timer-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                <path class="timer-stroke" id="battle-timer-stroke" stroke-dasharray="100, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+              </svg>
+              <div class="battle-timer-val" id="arena-timer-val">10</div>
+            </div>
+          </div>
+
+          <!-- Player 2 Score (Right) -->
+          <div class="player-score-card p2-card" id="arena-p2-card">
+            <div class="player-score-avatar" id="arena-p2-avatar">🧑‍🎓</div>
+            <div class="player-score-info">
+              <div class="player-score-name" id="arena-p2-name">Opponent</div>
+              <div class="player-score-points" id="arena-p2-score">0 pts</div>
+            </div>
+            <div class="player-status-badge" id="arena-p2-status">Waiting</div>
+          </div>
+        </div>
+
+        <!-- Ready Count down Overlay -->
+        <div id="battle-start-overlay" class="battle-overlay hidden">
+          <div class="battle-overlay-box">
+            <div style="font-size: 1.5rem; margin-bottom: 10px; font-weight:700;">GET READY!</div>
+            <div class="battle-countdown-num" id="battle-countdown-num">3</div>
+          </div>
+        </div>
+
+        <!-- Question Block -->
+        <div class="quiz-question-card" style="margin-top:20px;">
+          <div class="quiz-q-num" id="arena-q-num">Question 1</div>
+          <div class="quiz-q-text" id="arena-q-text">Loading question...</div>
+        </div>
+
+        <!-- MCQ options -->
+        <div class="quiz-options" id="arena-options">
+          <!-- Generated dynamically -->
+        </div>
+
+        <!-- Explanation (Initially Hidden) -->
+        <div id="arena-explanation" class="quiz-explanation hidden" style="margin-top:15px;">
+          <div class="explanation-label">💡 EXPLANATION</div>
+          <div id="arena-exp-text" class="explanation-text"></div>
+        </div>
+      </div>
+
+      <!-- QUIZ BATTLE RESULTS -->
+      <div id="screen-quiz-battle-results" class="inner-screen">
+        <div class="quiz-result" style="max-width:500px; margin:0 auto;">
+          <div class="result-emoji" id="battle-result-emoji">🏆</div>
+          <h2 class="result-title" id="battle-result-title">Victory!</h2>
+          <p class="result-score" id="battle-result-score">Final Score: 4 vs 2</p>
+          <div class="result-xp" id="battle-result-xp">+80 XP</div>
+          
+          <div class="content-card" style="text-align:left; margin-bottom:20px;">
+            <h3 id="battle-result-msg-title" style="color:var(--accent);">Message</h3>
+            <p class="intro-text" id="battle-result-msg-body">Great job defeating your opponent! Keep it up!</p>
+          </div>
+
+          <div class="result-actions">
+            <button class="btn-primary" onclick="rematchBattle()">Request Rematch ⚔️</button>
+            <button class="btn-secondary" onclick="showScreen('home')">Back to Home 🏠</button>
+          </div>
+        </div>
       </div>
 
     </div><!-- end screens-wrap -->
@@ -631,6 +785,76 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<!-- ===== SMART FOCUS: CONSENT MODAL ===== -->
+<div id="smart-focus-modal" class="sf-modal sf-hidden">
+  <div class="sf-modal-box">
+    <div style="font-size:3rem; margin-bottom:12px;">🧠</div>
+    <h2 style="font-size:1.5rem; color:var(--secondary); margin-bottom:8px;">Smart Focus Mode</h2>
+    <p style="color:var(--text2); font-size:0.88rem; line-height:1.6; margin-bottom:16px;">
+      This feature uses your <strong>webcam to detect your facial expressions</strong> during learning.<br>
+      Based on how you look, the AI will adjust question difficulty, offer hints, and keep you engaged.<br><br>
+      <span style="color:var(--text3); font-size:0.8rem;">🔒 <strong>Privacy:</strong> Frames are analysed instantly and <strong>never stored or recorded</strong>.</span>
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px;">
+      <button class="btn-primary" onclick="confirmSmartFocus()" id="sf-allow-btn">Allow Camera Access 📷</button>
+      <button class="btn-secondary" onclick="cancelSmartFocus()">Not Now</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SMART FOCUS: TROUBLESHOOTING MODAL ===== -->
+<div id="sf-troubleshoot-modal" class="sf-modal sf-hidden">
+  <div class="sf-modal-box sf-troubleshoot-box" style="max-width: 480px; text-align: left;">
+    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+      <span style="font-size: 2.5rem;">📷</span>
+      <div>
+        <h2 style="font-size: 1.4rem; color: var(--secondary); margin: 0;" id="sf-troubleshoot-title">Camera Troubleshooting</h2>
+        <span style="font-size: 0.75rem; color: var(--text3);" id="sf-error-code">Error Code: Unknown</span>
+      </div>
+    </div>
+    
+    <div id="sf-troubleshoot-content" class="sf-troubleshoot-content">
+      <!-- Content will be injected dynamically via JS based on error -->
+    </div>
+    
+    <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 8px;">
+      <button class="btn-primary" onclick="window.location.reload()" style="padding: 10px;">🔄 Refresh & Retry</button>
+      <button class="btn-secondary" onclick="document.getElementById('sf-troubleshoot-modal').classList.add('sf-hidden')" style="padding: 10px;">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SMART FOCUS: FLOATING CAMERA WIDGET ===== -->
+<div id="smart-focus-widget" class="sf-widget sf-hidden">
+  <div class="sf-widget-header">
+    <span class="sf-status-dot" id="sf-status-dot"></span>
+    <span class="sf-status-text" id="sf-status-text">Starting...</span>
+    <button class="sf-minimize-btn" onclick="toggleSmartFocusWidget()" title="Minimise">⟨</button>
+    <button class="sf-close-btn" onclick="onSmartFocusToggle(false); document.getElementById('smart-focus-toggle').checked=false;" title="Turn off">✕</button>
+  </div>
+  <div class="sf-camera-wrap" id="sf-camera-wrap">
+    <video id="focus-camera-feed" autoplay muted playsinline class="sf-video"></video>
+    <div class="sf-emotion-badge" id="sf-emotion-badge">😊 Ready</div>
+  </div>
+</div>
+
+<!-- Hidden canvas for frame capture -->
+<canvas id="focus-camera-canvas" style="display:none;" width="320" height="240"></canvas>
+
+<!-- ===== SMART FOCUS: ENGAGEMENT POPUP ===== -->
+<div id="sf-engagement-popup" class="sf-engagement-popup sf-hidden">
+  <div class="sf-popup-inner">
+    <button class="sf-popup-close" onclick="dismissEngagementPopup()">✕</button>
+    <div class="sf-popup-icon" id="sf-popup-icon">💡</div>
+    <h3 class="sf-popup-title" id="sf-popup-title">Quick Challenge!</h3>
+    <p class="sf-popup-body" id="sf-popup-body">Loading...</p>
+    <button class="btn-primary" onclick="dismissEngagementPopup()" style="margin-top:12px; font-size:0.85rem; padding:8px 20px;">Got it! Let's go →</button>
+  </div>
+</div>
+
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/pico.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
