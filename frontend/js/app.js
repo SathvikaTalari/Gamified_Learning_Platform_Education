@@ -319,6 +319,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
 // ===== NAVIGATION =====
 function showScreen(name) {
+  // Sync focus data if navigating away from a lesson or quiz
+  const activeScreenEl = document.querySelector('.inner-screen.active');
+  const prevScreen = activeScreenEl ? activeScreenEl.id.replace('screen-', '') : '';
+  if (prevScreen === 'lesson' || prevScreen === 'quiz') {
+    if (typeof SmartFocus !== 'undefined') {
+      SmartFocus.syncFocusData();
+    }
+  }
+
   document.querySelectorAll('.inner-screen').forEach(s => s.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b => b.classList.remove('active'));
   const screen = document.getElementById('screen-' + name);
@@ -596,6 +605,9 @@ async function openSubject(id, name, icon, color, desc) {
 async function openLesson(id) {
   currentLessonId = id;
   showScreen('lesson');
+  if (typeof SmartFocus !== 'undefined') {
+    SmartFocus.startFocusSession(id);
+  }
   try {
     let lesson;
     if (navigator.onLine) {
@@ -718,6 +730,9 @@ function goBackFromLesson() {
 // ===== QUIZ =====
 async function startQuiz(lessonId) {
   showScreen('quiz');
+  if (typeof SmartFocus !== 'undefined') {
+    SmartFocus.startFocusSession(lessonId);
+  }
   try {
     let lesson;
     if (navigator.onLine) {
@@ -1171,6 +1186,43 @@ async function loadTeacherHome() {
       }).join('');
     } else {
       subFeedEl.innerHTML = '<div class="empty-state">No quiz submissions yet.</div>';
+    }
+
+    // Student Focus Metrics
+    const focusEl = document.getElementById('t-focus-metrics');
+    if (focusEl) {
+      if (dash.studentFocusMetrics && dash.studentFocusMetrics.length) {
+        focusEl.innerHTML = dash.studentFocusMetrics.map(s => {
+          const totalMin = Math.round((s.total_focus + s.total_distracted) / 60);
+          const focusMin = Math.round(s.total_focus / 60);
+          const distractedMin = Math.round(s.total_distracted / 60);
+          const efficiency = s.efficiency;
+          
+          return `
+            <div class="t-focus-item">
+              <div class="t-focus-header">
+                <span class="t-focus-avatar">${s.avatar || '🧑‍🎓'}</span>
+                <div>
+                  <div class="t-focus-name">${s.name}</div>
+                  <div class="t-focus-sub">Grade ${s.grade || '6'} · ${s.school || 'Unknown School'}</div>
+                </div>
+                <span class="t-focus-score-meta">${efficiency}% Efficiency</span>
+              </div>
+              <div class="t-focus-bars-wrap">
+                <div class="t-focus-bar-label">
+                  <span>Focus: ${focusMin}m (${Math.round(s.total_focus)}s)</span>
+                  <span>Distracted: ${distractedMin}m (${Math.round(s.total_distracted)}s)</span>
+                </div>
+                <div class="sf-efficiency-track" title="Focus efficiency: ${efficiency}%">
+                  <div class="sf-efficiency-fill" style="width: ${efficiency}%"></div>
+                </div>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        focusEl.innerHTML = '<div class="empty-state">No focus data recorded yet.</div>';
+      }
     }
 
   } catch(e) {
@@ -2946,6 +2998,13 @@ const SmartFocus = {
   LOW_ENGAGEMENT_THRESHOLD: 3,     // 3 consecutive low readings before intervention
   CONFUSED_THRESHOLD: 2,
 
+  // --- Session Telemetry Tracker ---
+  currentLessonId: null,
+  sessionFocusSeconds: 0,
+  sessionDistractedSeconds: 0,
+  continuousFocusSeconds: 0,
+  sessionTimerInterval: null,
+
   // --- Offline Local Tracking State ---
   localInterval: null,
   cascadeLoaded: false,
@@ -3219,10 +3278,21 @@ const SmartFocus = {
       }
     }
 
+    this.currentEmotion = currentEmotion;
+    this.currentEngagement = currentEngagement;
+
+    // Update distraction vignette overlay
+    const overlay = document.getElementById('sf-distraction-overlay');
+    if (overlay) {
+      if (currentEmotion === 'distracted') {
+        overlay.classList.add('active');
+      } else {
+        overlay.classList.remove('active');
+      }
+    }
+
     // 1. Update UI dot and badge immediately for smooth, responsive feedback
     this.updateLocalUI(currentEmotion, currentEngagement, explanation);
-
-    // 2. Direct transition-based adaptation (rate-limited/deduplicated)
     if (currentEmotion === 'distracted' || currentEmotion === 'bored') {
       if (this.lastTriggeredEmotion !== currentEmotion) {
         this.lastTriggeredEmotion = currentEmotion;
@@ -3428,6 +3498,14 @@ const SmartFocus = {
     document.getElementById('smart-focus-widget').classList.remove('sf-hidden');
     this.setStatus('active', 'Focus AI active 🧠');
     this.startLoop();
+
+    // If we are currently in a lesson/quiz, start/resume the session timer
+    const activeScreenEl = document.querySelector('.inner-screen.active');
+    const activeScreen = activeScreenEl ? activeScreenEl.id.replace('screen-', '') : '';
+    if ((activeScreen === 'lesson' || activeScreen === 'quiz') && this.currentLessonId) {
+      this.startFocusSession(this.currentLessonId);
+    }
+
     return true;
   },
 
@@ -3436,11 +3514,144 @@ const SmartFocus = {
     this.active = false;
     this.stopLoop();
     this.stopCamera();
+    if (this.sessionTimerInterval) {
+      clearInterval(this.sessionTimerInterval);
+      this.sessionTimerInterval = null;
+    }
+    this.syncFocusData();
+    const overlay = document.getElementById('sf-distraction-overlay');
+    if (overlay) {
+      overlay.classList.remove('active');
+    }
     document.getElementById('smart-focus-widget').classList.add('sf-hidden');
     document.getElementById('sf-engagement-popup').classList.add('sf-hidden');
     document.body.classList.remove('sf-calm-pulse');
     const badge = document.getElementById('sf-emotion-badge');
     if (badge) { badge.textContent = '😊 Ready'; badge.className = 'sf-emotion-badge'; }
+  },
+
+  startFocusSession(lessonId) {
+    // If it's a different lesson, sync the previous lesson's data first
+    if (this.currentLessonId && this.currentLessonId !== lessonId) {
+      this.syncFocusData();
+    }
+
+    this.currentLessonId = lessonId;
+    this.sessionFocusSeconds = 0;
+    this.sessionDistractedSeconds = 0;
+    this.continuousFocusSeconds = 0;
+
+    if (this.sessionTimerInterval) {
+      clearInterval(this.sessionTimerInterval);
+    }
+
+    // Always start the interval loop for the active lesson session
+    this.sessionTimerInterval = setInterval(() => {
+      if (this.active) {
+        this.onSessionTimerTick();
+      }
+    }, 1000);
+
+    const timerText = document.getElementById('sf-timer-text');
+    if (timerText) {
+      timerText.textContent = `⏱️ 00:00`;
+    }
+  },
+
+  onSessionTimerTick() {
+    if (!this.active || !this.currentLessonId) return;
+
+    if (this.currentEmotion === 'distracted') {
+      this.sessionDistractedSeconds++;
+      this.continuousFocusSeconds = 0;
+    } else {
+      this.sessionFocusSeconds++;
+      this.continuousFocusSeconds++;
+
+      if (this.continuousFocusSeconds >= 60) {
+        this.continuousFocusSeconds = 0;
+        this.awardFocusXP();
+      }
+    }
+
+    const timerText = document.getElementById('sf-timer-text');
+    if (timerText) {
+      timerText.textContent = `⏱️ ${this.formatTime(this.sessionFocusSeconds)}`;
+    }
+  },
+
+  formatTime(sec) {
+    const mins = Math.floor(sec / 60);
+    const secs = sec % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  },
+
+  async awardFocusXP() {
+    try {
+      // Award +5 XP via the API
+      const result = await api('/api/profile/xp', 'POST', { xp: 5 });
+      if (currentUser) {
+        currentUser.xp = result.totalXP;
+        currentUser.level = Math.floor(result.totalXP / 200) + 1;
+        updateNavStats();
+      }
+      
+      // Update home screen XP bar if home is currently active
+      if (document.getElementById('screen-home').classList.contains('active')) {
+        loadHome();
+      }
+
+      // Show floaty XP notification
+      this.showFloatyXP('+5 XP Focus Spark! ⚡');
+      showToast('⚡ Focus Spark: +5 XP! Keep focusing!');
+    } catch (err) {
+      console.error('[SmartFocus] Error awarding focus XP:', err);
+    }
+  },
+
+  showFloatyXP(text) {
+    const floatEl = document.createElement('div');
+    floatEl.className = 'sf-xp-reward-float';
+    floatEl.textContent = text;
+    
+    // Position it in the center of the viewport, or slightly randomized around the center
+    const x = window.innerWidth / 2 - 100 + Math.random() * 50;
+    const y = window.innerHeight / 2 - 50 + Math.random() * 50;
+    floatEl.style.left = `${x}px`;
+    floatEl.style.top = `${y}px`;
+    
+    document.body.appendChild(floatEl);
+    
+    // Automatically remove it after the animation completes (1.8s)
+    setTimeout(() => {
+      floatEl.remove();
+    }, 1800);
+  },
+
+  async syncFocusData() {
+    if (!this.currentLessonId) return;
+    const fSec = this.sessionFocusSeconds;
+    const dSec = this.sessionDistractedSeconds;
+    // If there is nothing to sync, return
+    if (fSec === 0 && dSec === 0) return;
+
+    // Reset session stats for next segment/sync, so we don't double sync if called multiple times
+    this.sessionFocusSeconds = 0;
+    this.sessionDistractedSeconds = 0;
+
+    try {
+      await api('/api/focus/sync', 'POST', {
+        lesson_id: this.currentLessonId,
+        focus_seconds: fSec,
+        distracted_seconds: dSec
+      });
+      console.log(`[SmartFocus] Synced ${fSec}s focus and ${dSec}s distraction for lesson ${this.currentLessonId}`);
+    } catch (err) {
+      console.error('[SmartFocus] Error syncing focus metrics:', err);
+      // Restore values on sync failure so they can be tried again next sync
+      this.sessionFocusSeconds += fSec;
+      this.sessionDistractedSeconds += dSec;
+    }
   },
 
   // --- Get current difficulty for quiz question filtering ---

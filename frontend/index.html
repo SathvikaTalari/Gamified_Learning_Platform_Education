@@ -297,6 +297,11 @@
               <h3 class="dash-title" style="color:#FF6B6B">🚨 At-Risk Students <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)">(no activity in 7 days)</span></h3>
               <div id="t-at-risk" class="dash-list"></div>
             </div>
+            <!-- Focus & Gaze Analytics -->
+            <div class="dash-card">
+              <h3 class="dash-title">🧠 Student Focus & Engagement</h3>
+              <div id="t-focus-metrics" class="dash-list"></div>
+            </div>
             <!-- Recent Submissions -->
             <div class="dash-card">
               <h3 class="dash-title">📥 Recent Quiz Submissions</h3>
@@ -829,6 +834,7 @@
   <div class="sf-widget-header">
     <span class="sf-status-dot" id="sf-status-dot"></span>
     <span class="sf-status-text" id="sf-status-text">Starting...</span>
+    <span class="sf-timer" id="sf-timer-text" style="margin-left: auto; margin-right: 8px; font-family: monospace; font-size: 0.78rem; font-weight: bold; color: var(--secondary);">⏱️ 00:00</span>
     <button class="sf-minimize-btn" onclick="toggleSmartFocusWidget()" title="Minimise">⟨</button>
     <button class="sf-close-btn" onclick="onSmartFocusToggle(false); document.getElementById('smart-focus-toggle').checked=false;" title="Turn off">✕</button>
   </div>
@@ -852,6 +858,8 @@
   </div>
 </div>
 
+<!-- ===== SMART FOCUS: DISTRACTION OVERLAY ===== -->
+<div id="sf-distraction-overlay" class="sf-distraction-vignette"></div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="js/pico.js"></script>

@@ -162,6 +162,17 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (lesson_id) REFERENCES lessons(id)
   );
+  CREATE TABLE IF NOT EXISTS focus_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    lesson_id INTEGER,
+    focus_seconds INTEGER DEFAULT 0,
+    distracted_seconds INTEGER DEFAULT 0,
+    updated_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (lesson_id) REFERENCES lessons(id),
+    UNIQUE(user_id, lesson_id)
+  );
 `);
 
 // Migration: add created_by to lessons if not exists
@@ -417,6 +428,31 @@ app.post('/api/profile/xp', auth, (req, res) => {
   res.json({ success: true, totalXP: user.xp });
 });
 
+// ===== FOCUS TELEMETRY SYNC =====
+app.post('/api/focus/sync', auth, (req, res) => {
+  const { lesson_id, focus_seconds, distracted_seconds } = req.body;
+  if (!lesson_id) return res.status(400).json({ error: 'lesson_id is required' });
+
+  const fSec = parseInt(focus_seconds) || 0;
+  const dSec = parseInt(distracted_seconds) || 0;
+
+  try {
+    db.prepare(`
+      INSERT INTO focus_sessions (user_id, lesson_id, focus_seconds, distracted_seconds)
+      VALUES (?, ?, ?, ?)
+      ON CONFLICT(user_id, lesson_id) DO UPDATE SET
+        focus_seconds = focus_seconds + excluded.focus_seconds,
+        distracted_seconds = distracted_seconds + excluded.distracted_seconds,
+        updated_at = datetime('now')
+    `).run(req.user.id, lesson_id, fSec, dSec);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[FocusSync] Error syncing focus metrics:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===== DASHBOARD (NEW) =====
 app.get('/api/dashboard', auth, (req, res) => {
     const today = new Date();
@@ -634,6 +670,23 @@ app.get('/api/teacher/dashboard', auth, requireRole('teacher'), (req, res) => {
     GROUP BY s.id
   `).all();
 
+  // 8. Focus Analytics per student
+  const studentFocusMetrics = db.prepare(`
+    SELECT u.name, u.avatar, u.grade, u.school,
+      COALESCE(SUM(fs.focus_seconds), 0) as total_focus,
+      COALESCE(SUM(fs.distracted_seconds), 0) as total_distracted,
+      CASE 
+        WHEN (SUM(fs.focus_seconds) + SUM(fs.distracted_seconds)) > 0 
+        THEN ROUND(CAST(SUM(fs.focus_seconds) AS FLOAT) / (SUM(fs.focus_seconds) + SUM(fs.distracted_seconds)) * 100, 1)
+        ELSE 100.0 
+      END as efficiency
+    FROM users u
+    LEFT JOIN focus_sessions fs ON u.id = fs.user_id
+    WHERE u.role = 'student'
+    GROUP BY u.id
+    ORDER BY total_focus DESC
+  `).all();
+
   res.json({
     totalStudents,
     classAvgScore: avgScore?.avg_pct || 0,
@@ -641,7 +694,8 @@ app.get('/api/teacher/dashboard', auth, requireRole('teacher'), (req, res) => {
     leastAttempted,
     atRiskStudents,
     recentSubmissions,
-    subjectStats
+    subjectStats,
+    studentFocusMetrics
   });
 });
 

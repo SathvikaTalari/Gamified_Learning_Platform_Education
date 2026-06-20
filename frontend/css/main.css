@@ -1446,4 +1446,119 @@ body.sf-calm-pulse::after {
   font-weight: 600;
 }
 
+/* ===== SMART FOCUS: TELEMETRY & WARNINGS ===== */
+
+/* Distraction Vignette - full screen warning border */
+.sf-distraction-vignette {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1040;
+  border: 4px solid rgba(239, 68, 68, 0.85);
+  box-shadow: inset 0 0 50px rgba(239, 68, 68, 0.5);
+  display: none;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.sf-distraction-vignette.active {
+  display: block;
+  opacity: 1;
+  animation: sf-vignette-pulse 1.8s infinite ease-in-out;
+}
+@keyframes sf-vignette-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.3);
+    border-color: rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    box-shadow: inset 0 0 60px rgba(239, 68, 68, 0.65);
+    border-color: rgba(239, 68, 68, 0.95);
+  }
+}
+
+/* Floaty XP reward animation */
+.sf-xp-reward-float {
+  position: fixed;
+  font-family: 'Baloo 2', cursive;
+  font-weight: 800;
+  font-size: 1.6rem;
+  color: #facc15;
+  text-shadow: 0 4px 10px rgba(250, 204, 21, 0.5);
+  pointer-events: none;
+  z-index: 2000;
+  animation: sf-float-up 1.8s forwards cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+@keyframes sf-float-up {
+  0% { opacity: 0; transform: translateY(20px) scale(0.6); }
+  15% { opacity: 1; transform: translateY(0) scale(1.1); }
+  80% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-80px) scale(0.8); }
+}
+
+/* Teacher Dashboard Focus Panel */
+.t-focus-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--card);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  margin-bottom: 10px;
+  border: 1px solid var(--border);
+  transition: transform 0.2s, border-color 0.2s;
+}
+.t-focus-item:hover {
+  transform: translateY(-2px);
+  border-color: var(--secondary);
+}
+.t-focus-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.t-focus-avatar {
+  font-size: 1.8rem;
+}
+.t-focus-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text);
+}
+.t-focus-sub {
+  font-size: 0.72rem;
+  color: var(--text3);
+}
+.t-focus-score-meta {
+  margin-left: auto;
+  font-family: 'Baloo 2', cursive;
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--secondary);
+}
+.t-focus-bars-wrap {
+  margin-top: 4px;
+}
+.t-focus-bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text2);
+  margin-bottom: 4px;
+}
+.sf-efficiency-track {
+  width: 100%;
+  height: 8px;
+  background: rgba(239, 68, 68, 0.2); /* Red for distraction */
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+.sf-efficiency-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--secondary), #4ade80); /* Green gradient for focus */
+  border-radius: 4px;
+  transition: width 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
 
