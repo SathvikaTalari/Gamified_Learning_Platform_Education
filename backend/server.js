@@ -181,12 +181,74 @@ try { db.exec('ALTER TABLE lessons ADD COLUMN title_or TEXT DEFAULT NULL'); } ca
 try { db.exec('ALTER TABLE questions ADD COLUMN question_mr TEXT DEFAULT NULL'); } catch(e) {}
 try { db.exec('ALTER TABLE questions ADD COLUMN question_or TEXT DEFAULT NULL'); } catch(e) {}
 
+// Migration: enhanced focus session tracking columns
+try { db.exec('ALTER TABLE focus_sessions ADD COLUMN distraction_events INTEGER DEFAULT 0'); } catch(e) {}
+try { db.exec('ALTER TABLE focus_sessions ADD COLUMN longest_focus_streak INTEGER DEFAULT 0'); } catch(e) {}
+try { db.exec('ALTER TABLE focus_sessions ADD COLUMN focus_xp_awarded INTEGER DEFAULT 0'); } catch(e) {}
+
+// Migration: Math Kingdom and Escape Room tracking columns in users table
+try { db.exec("ALTER TABLE users ADD COLUMN kingdom_data TEXT DEFAULT ''"); } catch(e) {}
+try { db.exec("ALTER TABLE users ADD COLUMN escape_room_time INTEGER DEFAULT 9999"); } catch(e) {}
+
+// Migration: Multilingual Support (preferred_languages and Telugu columns)
+try { db.exec("ALTER TABLE users ADD COLUMN preferred_languages TEXT DEFAULT '[\"en\"]'"); } catch(e) {}
+try { db.exec("ALTER TABLE lessons ADD COLUMN title_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE lessons ADD COLUMN intro_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE lessons ADD COLUMN concepts_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN question_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN option_a_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN option_b_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN option_c_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN option_d_te TEXT DEFAULT NULL"); } catch(e) {}
+try { db.exec("ALTER TABLE questions ADD COLUMN explanation_te TEXT DEFAULT NULL"); } catch(e) {}
+
+// Setup Collaborative Group Challenges & Study Groups tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS group_challenges (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    target_lessons INTEGER NOT NULL,
+    deadline TEXT NOT NULL,
+    badge_name TEXT NOT NULL,
+    badge_icon TEXT NOT NULL,
+    team_size INTEGER DEFAULT 4,
+    created_by INTEGER,
+    created_at TEXT DEFAULT (datetime('now'))
+  );
+  CREATE TABLE IF NOT EXISTS study_groups (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    challenge_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    creator_id INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (challenge_id) REFERENCES group_challenges(id)
+  );
+  CREATE TABLE IF NOT EXISTS study_group_members (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    joined_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (group_id) REFERENCES study_groups(id),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(group_id, user_id)
+  );
+  CREATE TABLE IF NOT EXISTS study_group_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    group_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    message TEXT NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (group_id) REFERENCES study_groups(id),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+
 // Data migrations for translation
 try {
-  db.prepare("UPDATE lessons SET title_or = 'ବୀଜଗଣିତର ପରିଚୟ' WHERE id = 1").run();
-  db.prepare("UPDATE lessons SET title_or = 'ନ୍ୟୁଟନଙ୍କ ଗତି ନିୟମ' WHERE id = 6").run();
-  db.prepare("UPDATE questions SET question_mr = 'जर x + 7 = 15, तर x म्हणजे काय?', question_or = 'ଯଦି x + 7 = 15, ତେବେ x ର ମାନ କେତେ?' WHERE id = 1").run();
-  db.prepare("UPDATE questions SET question_mr = 'F = ma म्हणजे काय?', question_or = 'F = ma ର ଅର୍ଥ କଣ?' WHERE id = 7").run(); // Wait, let's verify if Question 7 is the F = ma question. Ah, in seed data, it says insertQ.run(6, 'F=ma ...') which actually is for lesson_id=6, but the actual ID of that question in the DB depends. Wait, let's do both or check the question text to be safe!
+  db.prepare("UPDATE lessons SET title_te = 'బీజగణితం పరిచయం', title_or = 'ବୀଜଗଣିତର ପରିଚୟ' WHERE id = 1").run();
+  db.prepare("UPDATE lessons SET title_te = 'న్యూటన్ గమన నియమాలు', title_or = 'ନ୍ୟୁଟନଙ୍କ ଗତି ନିୟମ' WHERE id = 6").run();
+  db.prepare("UPDATE questions SET question_te = 'ఒకవేళ x + 7 = 15 అయితే, x విలువ ఎంత?', question_mr = 'जर x + 7 = 15, तर x म्हणजे काय?', question_or = 'ଯଦି x + 7 = 15, ତେବେ x ର ମାନ କେତେ?' WHERE id = 1").run();
+  db.prepare("UPDATE questions SET question_te = 'F = ma అంటే ఏమిటి?', question_mr = 'F = ma म्हणजे काय?', question_or = 'F = ma ର ଅର୍ଥ କଣ?' WHERE id = 7").run(); // Wait, let's verify if Question 7 is the F = ma question. Ah, in seed data, it says insertQ.run(6, 'F=ma ...') which actually is for lesson_id=6, but the actual ID of that question in the DB depends. Wait, let's do both or check the question text to be safe!
 } catch(e) {
   console.error('Translation data migration error:', e);
 }
@@ -342,7 +404,7 @@ function requireRole(...roles) {
 
 // ===== REGISTER =====
 app.post('/api/register', (req, res) => {
-  const { name, email, password, role, grade, school, language, department, subject_specialization } = req.body;
+  const { name, email, password, role, grade, school, language, languages, department, subject_specialization } = req.body;
 
   if (!name || !email || !password) return res.status(400).json({ error: 'Name, email and password are required' });
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -359,13 +421,20 @@ app.post('/api/register', (req, res) => {
     const hashed = bcrypt.hashSync(password, 10);
     const avatar = userRole === 'teacher' ? '👩‍🏫' : '🧑‍🎓';
 
+    let preferredLanguagesStr = '["en"]';
+    if (languages && Array.isArray(languages) && languages.length > 0) {
+      preferredLanguagesStr = JSON.stringify(languages);
+    } else if (language) {
+      preferredLanguagesStr = JSON.stringify([language]);
+    }
+
     const result = db.prepare(
-      'INSERT INTO users (name, email, password, role, grade, school, department, subject_specialization, language, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      'INSERT INTO users (name, email, password, role, grade, school, department, subject_specialization, language, preferred_languages, avatar) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
     ).run(
       name.trim(), email.trim().toLowerCase(), hashed, userRole,
       userRole === 'student' ? (grade || 6) : null, userRole === 'student' ? (school || '').trim() : '',
       userRole === 'teacher' ? (department || '').trim() : '', userRole === 'teacher' ? (subject_specialization || '').trim() : '',
-      language || 'en', avatar
+      language || 'en', preferredLanguagesStr, avatar
     );
 
     db.prepare('INSERT INTO leaderboard (user_id) VALUES (?)').run(result.lastInsertRowid);
@@ -377,7 +446,7 @@ app.post('/api/register', (req, res) => {
         id: result.lastInsertRowid, name: name.trim(), email: email.trim().toLowerCase(), role: userRole,
         grade: userRole === 'student' ? (grade || 6) : null, school: userRole === 'student' ? (school || '').trim() : '',
         department: userRole === 'teacher' ? (department || '').trim() : '', subject_specialization: userRole === 'teacher' ? (subject_specialization || '').trim() : '',
-        language: language || 'en', avatar, xp: 0, level: 1, streak: 0
+        language: language || 'en', preferred_languages: preferredLanguagesStr, avatar, xp: 0, level: 1, streak: 0
       }
     });
   } catch(e) {
@@ -404,17 +473,93 @@ app.post('/api/login', (req, res) => {
     user: {
       id: user.id, name: user.name, email: user.email, role: user.role, grade: user.grade, school: user.school,
       department: user.department, subject_specialization: user.subject_specialization, xp: user.xp, level: user.level,
-      streak: user.streak + 1, avatar: user.avatar, language: user.language
+      streak: user.streak + 1, avatar: user.avatar, language: user.language, preferred_languages: user.preferred_languages || '["en"]'
     }
   });
 });
 
 // ===== PROFILE =====
 app.get('/api/profile', auth, (req, res) => {
-  const user = db.prepare('SELECT id, name, email, role, grade, school, department, subject_specialization, language, avatar, xp, level, streak, created_at FROM users WHERE id = ?').get(req.user.id);
+  const user = db.prepare('SELECT id, name, email, role, grade, school, department, subject_specialization, language, preferred_languages, avatar, xp, level, streak, kingdom_data, escape_room_time, created_at FROM users WHERE id = ?').get(req.user.id);
   const badges = db.prepare('SELECT b.* FROM badges b JOIN user_badges ub ON b.id = ub.badge_id WHERE ub.user_id = ?').all(req.user.id);
   const progress = db.prepare('SELECT COUNT(*) as completed FROM user_progress WHERE user_id = ? AND completed = 1').get(req.user.id);
   res.json({ ...user, badges, lessonsCompleted: progress.completed });
+});
+
+// ===== MATH MINIGAMES API =====
+
+// Save Math Kingdom Data
+app.post('/api/math-kingdom/save', auth, (req, res) => {
+  const { kingdom_data } = req.body;
+  if (kingdom_data === undefined) return res.status(400).json({ error: 'kingdom_data is required' });
+
+  try {
+    const kingdomStr = typeof kingdom_data === 'object' ? JSON.stringify(kingdom_data) : kingdom_data;
+    db.prepare('UPDATE users SET kingdom_data = ? WHERE id = ?').run(kingdomStr, req.user.id);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error saving kingdom:', err);
+    res.status(500).json({ error: 'Database error saving kingdom' });
+  }
+});
+
+// Submit Escape Room Time (Personal Best)
+app.post('/api/escape-room/submit', auth, (req, res) => {
+  const { escape_time } = req.body;
+  if (escape_time === undefined) return res.status(400).json({ error: 'escape_time is required' });
+
+  const timeInt = parseInt(escape_time);
+  if (isNaN(timeInt)) return res.status(400).json({ error: 'Invalid time value' });
+
+  try {
+    const current = db.prepare('SELECT escape_room_time FROM users WHERE id = ?').get(req.user.id);
+    const bestTime = current ? current.escape_room_time : 9999;
+
+    if (timeInt < bestTime) {
+      db.prepare('UPDATE users SET escape_room_time = ? WHERE id = ?').run(timeInt, req.user.id);
+      res.json({ success: true, personalBest: true, time: timeInt });
+    } else {
+      res.json({ success: true, personalBest: false, time: bestTime });
+    }
+  } catch (err) {
+    console.error('Error saving escape time:', err);
+    res.status(500).json({ error: 'Database error saving escape time' });
+  }
+});
+
+// Fetch leaderboards for both Math minigames (Contests)
+app.get('/api/leaderboard/math-games', auth, (req, res) => {
+  try {
+    const allKingdomUsers = db.prepare("SELECT id, name, avatar, grade, school, kingdom_data FROM users WHERE role = 'student' AND kingdom_data IS NOT NULL AND kingdom_data != ''").all();
+
+    const kingdomLeaderboard = allKingdomUsers.map(u => {
+      let size = 0;
+      let data = {};
+      try {
+        data = JSON.parse(u.kingdom_data);
+        const towers = parseInt(data.towers) || 0;
+        const houses = parseInt(data.houses) || 0;
+        const land = parseInt(data.land) || 0;
+        size = (towers * 3) + (houses * 2) + land;
+      } catch (e) {}
+      return {
+        id: u.id,
+        name: u.name,
+        avatar: u.avatar,
+        grade: u.grade,
+        school: u.school,
+        kingdomSize: size,
+        kingdomDetails: data
+      };
+    }).sort((a, b) => b.kingdomSize - a.kingdomSize).slice(0, 15);
+
+    const escapeLeaderboard = db.prepare("SELECT name, avatar, grade, school, escape_room_time FROM users WHERE role = 'student' AND escape_room_time > 0 AND escape_room_time < 9999 ORDER BY escape_room_time ASC LIMIT 15").all();
+
+    res.json({ kingdomLeaderboard, escapeLeaderboard });
+  } catch (err) {
+    console.error('Error fetching math leaderboards:', err);
+    res.status(500).json({ error: 'Database error fetching leaderboard data' });
+  }
 });
 app.post('/api/profile/xp', auth, (req, res) => {
   const { xp } = req.body;
@@ -430,25 +575,111 @@ app.post('/api/profile/xp', auth, (req, res) => {
 
 // ===== FOCUS TELEMETRY SYNC =====
 app.post('/api/focus/sync', auth, (req, res) => {
-  const { lesson_id, focus_seconds, distracted_seconds } = req.body;
+  const { lesson_id, focus_seconds, distracted_seconds, distraction_events, longest_focus_streak, focus_xp_awarded } = req.body;
   if (!lesson_id) return res.status(400).json({ error: 'lesson_id is required' });
 
   const fSec = parseInt(focus_seconds) || 0;
   const dSec = parseInt(distracted_seconds) || 0;
+  const dEvt = parseInt(distraction_events) || 0;
+  const lStreak = parseInt(longest_focus_streak) || 0;
+  const fXp = parseInt(focus_xp_awarded) || 0;
 
   try {
     db.prepare(`
-      INSERT INTO focus_sessions (user_id, lesson_id, focus_seconds, distracted_seconds)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO focus_sessions
+        (user_id, lesson_id, focus_seconds, distracted_seconds, distraction_events, longest_focus_streak, focus_xp_awarded)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(user_id, lesson_id) DO UPDATE SET
-        focus_seconds = focus_seconds + excluded.focus_seconds,
-        distracted_seconds = distracted_seconds + excluded.distracted_seconds,
-        updated_at = datetime('now')
-    `).run(req.user.id, lesson_id, fSec, dSec);
+        focus_seconds       = focus_sessions.focus_seconds + excluded.focus_seconds,
+        distracted_seconds  = focus_sessions.distracted_seconds + excluded.distracted_seconds,
+        distraction_events  = focus_sessions.distraction_events + excluded.distraction_events,
+        longest_focus_streak = MAX(focus_sessions.longest_focus_streak, excluded.longest_focus_streak),
+        focus_xp_awarded    = focus_sessions.focus_xp_awarded + excluded.focus_xp_awarded,
+        updated_at          = datetime('now')
+    `).run(req.user.id, lesson_id, fSec, dSec, dEvt, lStreak, fXp);
 
     res.json({ success: true });
   } catch (err) {
     console.error('[FocusSync] Error syncing focus metrics:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== FOCUS HISTORY: Student's own per-lesson breakdown =====
+app.get('/api/focus/my-history', auth, (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        l.title AS lesson_title, s.name AS subject_name, s.icon AS subject_icon, s.color AS subject_color,
+        fs.focus_seconds, fs.distracted_seconds, fs.distraction_events,
+        fs.longest_focus_streak, fs.focus_xp_awarded, fs.updated_at,
+        CASE
+          WHEN (fs.focus_seconds + fs.distracted_seconds) > 0
+          THEN ROUND(CAST(fs.focus_seconds AS FLOAT) / (fs.focus_seconds + fs.distracted_seconds) * 100, 1)
+          ELSE 100.0
+        END AS efficiency
+      FROM focus_sessions fs
+      JOIN lessons l ON l.id = fs.lesson_id
+      JOIN subjects s ON s.id = l.subject_id
+      WHERE fs.user_id = ?
+      ORDER BY fs.updated_at DESC
+    `).all(req.user.id);
+
+    // Overall totals
+    const totals = db.prepare(`
+      SELECT
+        COALESCE(SUM(focus_seconds), 0) AS total_focus,
+        COALESCE(SUM(distracted_seconds), 0) AS total_distracted,
+        COALESCE(SUM(distraction_events), 0) AS total_events,
+        COALESCE(MAX(longest_focus_streak), 0) AS best_streak,
+        COALESCE(SUM(focus_xp_awarded), 0) AS total_xp
+      FROM focus_sessions WHERE user_id = ?
+    `).get(req.user.id);
+
+    res.json({ lessons: rows, totals });
+  } catch (err) {
+    console.error('[FocusHistory] Error:', err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ===== TEACHER: Per-student focus detail =====
+app.get('/api/teacher/student/:id/focus', auth, requireRole('teacher'), (req, res) => {
+  const studentId = parseInt(req.params.id);
+  try {
+    const student = db.prepare('SELECT id, name, avatar, grade, school FROM users WHERE id = ? AND role = ?').get(studentId, 'student');
+    if (!student) return res.status(404).json({ error: 'Student not found' });
+
+    const lessons = db.prepare(`
+      SELECT
+        l.title AS lesson_title, s.name AS subject_name, s.icon AS subject_icon, s.color AS subject_color,
+        fs.focus_seconds, fs.distracted_seconds, fs.distraction_events,
+        fs.longest_focus_streak, fs.focus_xp_awarded, fs.updated_at,
+        CASE
+          WHEN (fs.focus_seconds + fs.distracted_seconds) > 0
+          THEN ROUND(CAST(fs.focus_seconds AS FLOAT) / (fs.focus_seconds + fs.distracted_seconds) * 100, 1)
+          ELSE 100.0
+        END AS efficiency
+      FROM focus_sessions fs
+      JOIN lessons l ON l.id = fs.lesson_id
+      JOIN subjects s ON s.id = l.subject_id
+      WHERE fs.user_id = ?
+      ORDER BY fs.updated_at DESC
+    `).all(studentId);
+
+    const totals = db.prepare(`
+      SELECT
+        COALESCE(SUM(focus_seconds), 0) AS total_focus,
+        COALESCE(SUM(distracted_seconds), 0) AS total_distracted,
+        COALESCE(SUM(distraction_events), 0) AS total_events,
+        COALESCE(MAX(longest_focus_streak), 0) AS best_streak,
+        COALESCE(SUM(focus_xp_awarded), 0) AS total_xp
+      FROM focus_sessions WHERE user_id = ?
+    `).get(studentId);
+
+    res.json({ student, lessons, totals });
+  } catch (err) {
+    console.error('[TeacherFocusDetail] Error:', err.message);
     res.status(500).json({ error: err.message });
   }
 });
@@ -575,6 +806,17 @@ app.post('/api/quiz/submit', auth, (req, res) => {
   if (user.xp >= 500) awardBadge(3);
   if (user.xp >= 1000) awardBadge(4);
   if (percentage === 100) awardBadge(6);
+
+  // Group challenge progress hook: emit socket event if user is in a group
+  try {
+    const userGroup = db.prepare('SELECT group_id FROM study_group_members WHERE user_id = ?').get(req.user.id);
+    if (userGroup && io) {
+      io.to('group_' + userGroup.group_id).emit('progressUpdated');
+    }
+  } catch (err) {
+    console.error('Error emitting group progress update:', err);
+  }
+
   res.json({ xpEarned, percentage, newBadges, totalXP: user.xp });
 });
 
@@ -670,11 +912,14 @@ app.get('/api/teacher/dashboard', auth, requireRole('teacher'), (req, res) => {
     GROUP BY s.id
   `).all();
 
-  // 8. Focus Analytics per student
+  // 8. Focus Analytics per student (enhanced)
   const studentFocusMetrics = db.prepare(`
-    SELECT u.name, u.avatar, u.grade, u.school,
+    SELECT u.id, u.name, u.avatar, u.grade, u.school,
       COALESCE(SUM(fs.focus_seconds), 0) as total_focus,
       COALESCE(SUM(fs.distracted_seconds), 0) as total_distracted,
+      COALESCE(SUM(fs.distraction_events), 0) as total_distraction_events,
+      COALESCE(MAX(fs.longest_focus_streak), 0) as best_streak,
+      COALESCE(SUM(fs.focus_xp_awarded), 0) as total_focus_xp,
       CASE 
         WHEN (SUM(fs.focus_seconds) + SUM(fs.distracted_seconds)) > 0 
         THEN ROUND(CAST(SUM(fs.focus_seconds) AS FLOAT) / (SUM(fs.focus_seconds) + SUM(fs.distracted_seconds)) * 100, 1)
@@ -687,6 +932,11 @@ app.get('/api/teacher/dashboard', auth, requireRole('teacher'), (req, res) => {
     ORDER BY total_focus DESC
   `).all();
 
+  // Mark at-risk by focus: efficiency < 50% OR total distraction events >= 10
+  const focusRiskStudents = studentFocusMetrics
+    .filter(s => (s.total_focus + s.total_distracted) > 0 && (s.efficiency < 50 || s.total_distraction_events >= 10))
+    .map(s => ({ id: s.id, name: s.name, avatar: s.avatar, efficiency: s.efficiency, events: s.total_distraction_events }));
+
   res.json({
     totalStudents,
     classAvgScore: avgScore?.avg_pct || 0,
@@ -695,7 +945,8 @@ app.get('/api/teacher/dashboard', auth, requireRole('teacher'), (req, res) => {
     atRiskStudents,
     recentSubmissions,
     subjectStats,
-    studentFocusMetrics
+    studentFocusMetrics,
+    focusRiskStudents
   });
 });
 
@@ -712,7 +963,462 @@ app.get('/api/teacher/lessons', auth, requireRole('teacher'), (req, res) => {
   res.json(lessons);
 });
 
+// ===== COLLABORATIVE GROUP CHALLENGES & STUDY GROUPS API =====
+
+// Teacher: Create group challenge
+app.post('/api/challenges/create', auth, requireRole('teacher'), (req, res) => {
+  const { name, target_lessons, deadline, badge_name, badge_icon, team_size } = req.body;
+  if (!name || !target_lessons || !deadline || !badge_name || !badge_icon) {
+    return res.status(400).json({ error: 'All fields (name, target_lessons, deadline, badge_name, badge_icon) are required' });
+  }
+  try {
+    const result = db.prepare(`
+      INSERT INTO group_challenges (name, target_lessons, deadline, badge_name, badge_icon, team_size, created_by)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(name.trim(), parseInt(target_lessons), deadline, badge_name.trim(), badge_icon.trim(), parseInt(team_size) || 4, req.user.id);
+    
+    res.json({ success: true, challengeId: result.lastInsertRowid });
+  } catch (err) {
+    console.error('[CreateChallenge] Error:', err);
+    res.status(500).json({ error: 'Database error creating challenge' });
+  }
+});
+
+// General: Get active challenges with their study groups
+app.get('/api/challenges/active', auth, (req, res) => {
+  try {
+    const challenges = db.prepare(`
+      SELECT c.*, u.name as creator_name
+      FROM group_challenges c
+      JOIN users u ON c.created_by = u.id
+      ORDER BY c.deadline ASC
+    `).all();
+
+    const challengesWithGroups = challenges.map(c => {
+      const groups = db.prepare(`
+        SELECT g.id, g.name, g.creator_id,
+          (SELECT COUNT(*) FROM study_group_members WHERE group_id = g.id) as member_count
+        FROM study_groups g
+        WHERE g.challenge_id = ?
+      `).all(c.id);
+      return { ...c, groups };
+    });
+
+    res.json(challengesWithGroups);
+  } catch (err) {
+    console.error('[GetChallenges] Error:', err);
+    res.status(500).json({ error: 'Database error fetching challenges' });
+  }
+});
+
+// Student: Create study group
+app.post('/api/groups/create', auth, requireRole('student'), (req, res) => {
+  const { challenge_id, name } = req.body;
+  if (!challenge_id || !name || !name.trim()) {
+    return res.status(400).json({ error: 'Challenge ID and group name are required' });
+  }
+  try {
+    // Check if user is already in a group for this challenge
+    const existingGroup = db.prepare(`
+      SELECT sgm.id
+      FROM study_group_members sgm
+      JOIN study_groups sg ON sgm.group_id = sg.id
+      WHERE sg.challenge_id = ? AND sgm.user_id = ?
+    `).get(challenge_id, req.user.id);
+
+    if (existingGroup) {
+      return res.status(400).json({ error: 'You are already in a study group for this challenge' });
+    }
+
+    // Create study group
+    const result = db.prepare(`
+      INSERT INTO study_groups (challenge_id, name, creator_id)
+      VALUES (?, ?, ?)
+    `).run(challenge_id, name.trim(), req.user.id);
+
+    const groupId = result.lastInsertRowid;
+
+    // Add creator to group members
+    db.prepare(`
+      INSERT INTO study_group_members (group_id, user_id)
+      VALUES (?, ?)
+    `).run(groupId, req.user.id);
+
+    res.json({ success: true, groupId });
+  } catch (err) {
+    console.error('[CreateGroup] Error:', err);
+    res.status(500).json({ error: 'Database error creating group' });
+  }
+});
+
+// Student: Join study group
+app.post('/api/groups/join', auth, requireRole('student'), (req, res) => {
+  const { group_id } = req.body;
+  if (!group_id) return res.status(400).json({ error: 'Group ID is required' });
+
+  try {
+    const group = db.prepare(`
+      SELECT sg.*, gc.team_size
+      FROM study_groups sg
+      JOIN group_challenges gc ON sg.challenge_id = gc.id
+      WHERE sg.id = ?
+    `).get(group_id);
+
+    if (!group) return res.status(404).json({ error: 'Study group not found' });
+
+    // Check if user is already in a group for this challenge
+    const existingGroup = db.prepare(`
+      SELECT sgm.id
+      FROM study_group_members sgm
+      JOIN study_groups sg ON sgm.group_id = sg.id
+      WHERE sg.challenge_id = ? AND sgm.user_id = ?
+    `).get(group.challenge_id, req.user.id);
+
+    if (existingGroup) {
+      return res.status(400).json({ error: 'You are already in a study group for this challenge' });
+    }
+
+    // Check member limit
+    const memberCount = db.prepare(`
+      SELECT COUNT(*) as c FROM study_group_members WHERE group_id = ?
+    `).get(group_id).c;
+
+    if (memberCount >= group.team_size) {
+      return res.status(400).json({ error: 'This study group is already full' });
+    }
+
+    db.prepare(`
+      INSERT INTO study_group_members (group_id, user_id)
+      VALUES (?, ?)
+    `).run(group_id, req.user.id);
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[JoinGroup] Error:', err);
+    res.status(500).json({ error: 'Database error joining group' });
+  }
+});
+
+// Student: Leave study group
+app.post('/api/groups/leave', auth, requireRole('student'), (req, res) => {
+  const { group_id } = req.body;
+  if (!group_id) return res.status(400).json({ error: 'Group ID is required' });
+
+  try {
+    const result = db.prepare(`
+      DELETE FROM study_group_members WHERE group_id = ? AND user_id = ?
+    `).run(group_id, req.user.id);
+
+    if (result.changes === 0) {
+      return res.status(400).json({ error: 'You are not a member of this group' });
+    }
+
+    const membersCount = db.prepare(`
+      SELECT COUNT(*) as c FROM study_group_members WHERE group_id = ?
+    `).get(group_id).c;
+
+    if (membersCount === 0) {
+      db.prepare('DELETE FROM study_group_messages WHERE group_id = ?').run(group_id);
+      db.prepare('DELETE FROM study_groups WHERE id = ?').run(group_id);
+    }
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[LeaveGroup] Error:', err);
+    res.status(500).json({ error: 'Database error leaving group' });
+  }
+});
+
+// Student: Get current group details
+app.get('/api/groups/my-group', auth, requireRole('student'), (req, res) => {
+  try {
+    const myMembership = db.prepare(`
+      SELECT group_id FROM study_group_members WHERE user_id = ? ORDER BY id DESC LIMIT 1
+    `).get(req.user.id);
+
+    if (!myMembership) {
+      return res.json({ inGroup: false });
+    }
+
+    const groupId = myMembership.group_id;
+
+    const group = db.prepare(`
+      SELECT sg.*, gc.name as challenge_name, gc.target_lessons, gc.deadline, gc.badge_name, gc.badge_icon, gc.team_size, gc.created_at as challenge_created_at
+      FROM study_groups sg
+      JOIN group_challenges gc ON sg.challenge_id = gc.id
+      WHERE sg.id = ?
+    `).get(groupId);
+
+    if (!group) {
+      return res.json({ inGroup: false });
+    }
+
+    const members = db.prepare(`
+      SELECT u.id, u.name, u.avatar, u.xp, u.level
+      FROM study_group_members sgm
+      JOIN users u ON sgm.user_id = u.id
+      WHERE sgm.group_id = ?
+    `).all(groupId);
+
+    let totalGroupLessonsCompleted = 0;
+    const membersWithContributions = members.map(m => {
+      const lessonsCompleted = db.prepare(`
+        SELECT COUNT(DISTINCT up.lesson_id) as count
+        FROM user_progress up
+        WHERE up.user_id = ?
+          AND up.completed = 1
+          AND up.completed_at >= ?
+      `).get(m.id, group.challenge_created_at).count;
+
+      totalGroupLessonsCompleted += lessonsCompleted;
+
+      return { ...m, lessonsCompleted };
+    });
+
+    let badgeUnlocked = false;
+    if (totalGroupLessonsCompleted >= group.target_lessons) {
+      badgeUnlocked = true;
+      let dbBadge = db.prepare('SELECT id FROM badges WHERE name = ?').get(group.badge_name);
+      let badgeId;
+      if (!dbBadge) {
+        const r = db.prepare('INSERT INTO badges (name, icon, description, requirement, xp_threshold) VALUES (?, ?, ?, ?, 0)')
+          .run(group.badge_name, group.badge_icon, `Earned by completing the Group Challenge: ${group.challenge_name}`, `Collaborative challenge completed`);
+        badgeId = r.lastInsertRowid;
+      } else {
+        badgeId = dbBadge.id;
+      }
+
+      members.forEach(m => {
+        const already = db.prepare('SELECT id FROM user_badges WHERE user_id = ? AND badge_id = ?').get(m.id, badgeId);
+        if (!already) {
+          db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(m.id, badgeId);
+        }
+      });
+    }
+
+    const messages = db.prepare(`
+      SELECT m.*, u.name as sender_name, u.avatar as sender_avatar
+      FROM study_group_messages m
+      JOIN users u ON m.user_id = u.id
+      WHERE m.group_id = ?
+      ORDER BY m.created_at ASC
+    `).all(groupId);
+
+    const allChallengeGroups = db.prepare(`
+      SELECT id, name
+      FROM study_groups
+      WHERE challenge_id = ?
+    `).all(group.challenge_id);
+
+    const groupLeaderboard = allChallengeGroups.map(g => {
+      const gMembers = db.prepare('SELECT user_id FROM study_group_members WHERE group_id = ?').all(g.id);
+      let score = 0;
+      gMembers.forEach(gm => {
+        const gmScore = db.prepare(`
+          SELECT COUNT(DISTINCT lesson_id) as count
+          FROM user_progress
+          WHERE user_id = ? AND completed = 1 AND completed_at >= ?
+        `).get(gm.user_id, group.challenge_created_at).count;
+        score += gmScore;
+      });
+      return {
+        id: g.id,
+        name: g.name,
+        progress: score,
+        isMyGroup: g.id === groupId
+      };
+    }).sort((a, b) => b.progress - a.progress);
+
+    const strugglingTeammates = db.prepare(`
+      SELECT sgm.user_id, u.name as student_name, up.lesson_id, l.title as lesson_title, s.name as subject_name
+      FROM study_group_members sgm
+      JOIN users u ON sgm.user_id = u.id
+      JOIN user_progress up ON sgm.user_id = up.user_id
+      JOIN lessons l ON up.lesson_id = l.id
+      JOIN subjects s ON l.subject_id = s.id
+      WHERE sgm.group_id = ?
+        AND sgm.user_id != ?
+        AND up.completed = 0
+        AND up.attempts > 0
+      LIMIT 1
+    `).get(groupId, req.user.id);
+
+    let weakestLink = null;
+    if (strugglingTeammates) {
+      const randomQ = db.prepare(`
+        SELECT id, question, question_hi, question_mr, question_or, option_a, option_b, option_c, option_d
+        FROM questions
+        WHERE lesson_id = ?
+        ORDER BY RANDOM() LIMIT 1
+      `).get(strugglingTeammates.lesson_id);
+
+      if (randomQ) {
+        weakestLink = {
+          studentName: strugglingTeammates.student_name,
+          lessonId: strugglingTeammates.lesson_id,
+          lessonTitle: strugglingTeammates.lesson_title,
+          subjectName: strugglingTeammates.subject_name,
+          question: randomQ
+        };
+      }
+    }
+
+    res.json({
+      inGroup: true,
+      group: {
+        id: group.id,
+        name: group.name,
+        targetLessons: group.target_lessons,
+        deadline: group.deadline,
+        badgeName: group.badge_name,
+        badgeIcon: group.badge_icon,
+        teamSize: group.team_size,
+        badgeUnlocked
+      },
+      members: membersWithContributions,
+      totalProgress: totalGroupLessonsCompleted,
+      messages,
+      leaderboard: groupLeaderboard,
+      weakestLink
+    });
+  } catch (err) {
+    console.error('[GetMyGroup] Error:', err);
+    res.status(500).json({ error: 'Database error fetching group details' });
+  }
+});
+
+// Student: Post message to chat
+app.post('/api/groups/chat', auth, requireRole('student'), (req, res) => {
+  const { group_id, message } = req.body;
+  if (!group_id || !message || !message.trim()) {
+    return res.status(400).json({ error: 'Group ID and message are required' });
+  }
+  try {
+    const isMember = db.prepare(`
+      SELECT id FROM study_group_members WHERE group_id = ? AND user_id = ?
+    `).get(group_id, req.user.id);
+
+    if (!isMember) {
+      return res.status(403).json({ error: 'Access denied: not a member of this group' });
+    }
+
+    db.prepare(`
+      INSERT INTO study_group_messages (group_id, user_id, message)
+      VALUES (?, ?, ?)
+    `).run(group_id, req.user.id, message.trim());
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error('[PostGroupChat] Error:', err);
+    res.status(500).json({ error: 'Database error saving message' });
+  }
+});
+
+// Student: Submit Weakest Link teammate help question
+app.post('/api/groups/weakest-link/submit', auth, requireRole('student'), (req, res) => {
+  const { group_id, lesson_id, question_id, answer, student_name } = req.body;
+  if (!group_id || !lesson_id || !question_id || !answer) {
+    return res.status(400).json({ error: 'Missing parameters' });
+  }
+
+  try {
+    const q = db.prepare('SELECT correct_answer, explanation FROM questions WHERE id = ?').get(question_id);
+    if (!q) return res.status(404).json({ error: 'Question not found' });
+
+    const isCorrect = q.correct_answer === answer;
+
+    if (isCorrect) {
+      db.prepare('UPDATE users SET xp = xp + 15 WHERE id = ?').run(req.user.id);
+      db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(req.user.id);
+      db.prepare('UPDATE leaderboard SET total_xp = total_xp + 15 WHERE user_id = ?').run(req.user.id);
+      
+      const dateStr = new Date().toISOString().split('T')[0];
+      const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(req.user.id, dateStr);
+      if (existingDaily) {
+        db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + 15 WHERE id = ?').run(existingDaily.id);
+      } else {
+        db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, 15)').run(req.user.id, dateStr);
+      }
+
+      const msg = `💡 System Alert: ${req.user.name} solved a bonus question correctly to support ${student_name || 'their teammate'} in this lesson! (+15 XP awarded to ${req.user.name})`;
+      
+      db.prepare(`
+        INSERT INTO study_group_messages (group_id, user_id, message)
+        VALUES (?, ?, ?)
+      `).run(group_id, req.user.id, msg);
+
+      if (io) {
+        io.to('group_' + group_id).emit('groupMessage', {
+          id: Date.now(),
+          group_id,
+          user_id: req.user.id,
+          message: msg,
+          sender_name: 'System',
+          sender_avatar: '🤖',
+          created_at: new Date().toISOString()
+        });
+        io.to('group_' + group_id).emit('progressUpdated');
+      }
+    }
+
+    res.json({
+      success: true,
+      correct: isCorrect,
+      correctAnswer: q.correct_answer,
+      explanation: q.explanation
+    });
+  } catch (err) {
+    console.error('[WeakestLinkSubmit] Error:', err);
+    res.status(500).json({ error: 'Database error processing help submission' });
+  }
+});
+
+// Teacher: Get stats for all created challenges and participating groups
+app.get('/api/teacher/challenges-stats', auth, requireRole('teacher'), (req, res) => {
+  try {
+    const challenges = db.prepare(`
+      SELECT * FROM group_challenges WHERE created_by = ? ORDER BY id DESC
+    `).all(req.user.id);
+
+    const stats = challenges.map(c => {
+      const groups = db.prepare(`
+        SELECT sg.id, sg.name,
+          (SELECT COUNT(*) FROM study_group_members WHERE group_id = sg.id) as member_count
+        FROM study_groups sg
+        WHERE sg.challenge_id = ?
+      `).all(c.id);
+
+      const groupsWithProgress = groups.map(g => {
+        const gMembers = db.prepare('SELECT user_id FROM study_group_members WHERE group_id = ?').all(g.id);
+        let progress = 0;
+        gMembers.forEach(gm => {
+          const gmScore = db.prepare(`
+            SELECT COUNT(DISTINCT lesson_id) as count
+            FROM user_progress
+            WHERE user_id = ? AND completed = 1 AND completed_at >= ?
+          `).get(gm.user_id, c.created_at).count;
+          progress += gmScore;
+        });
+
+        const memberNames = db.prepare(`
+          SELECT u.name FROM users u JOIN study_group_members sgm ON u.id = sgm.user_id WHERE sgm.group_id = ?
+        `).all(g.id).map(m => m.name).join(', ');
+
+        return { ...g, progress, memberNames };
+      });
+
+      return { ...c, groups: groupsWithProgress };
+    });
+
+    res.json(stats);
+  } catch (err) {
+    console.error('[GetTeacherChallengesStats] Error:', err);
+    res.status(500).json({ error: 'Database error fetching stats' });
+  }
+});
+
 // ===== TEACHER: CREATE LESSON =====
+
 app.post('/api/teacher/lessons', auth, requireRole('teacher'), (req, res) => {
   const { subject_id, title, content, difficulty, xp_reward, grade, questions } = req.body;
   if (!subject_id || !title || !content) {
@@ -767,18 +1473,27 @@ app.delete('/api/teacher/lessons/:id', auth, requireRole('teacher'), (req, res) 
 
 // ===== AI SMART TUTOR =====
 app.post('/api/chat', auth, async (req, res) => {
-  const { message, language } = req.body;
+  const { message, language, lessonTitle, lessonContent } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
   if (!process.env.GROQ_API_KEY) {
     return res.status(500).json({ error: 'AI Tutor is currently unavailable (Groq API key missing)' });
   }
 
-  const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi', or: 'Odia' };
+  const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi', te: 'Telugu' };
   const targetLanguage = langMap[language] || 'English';
+
+  let contextSnippet = '';
+  if (lessonTitle) {
+    contextSnippet = `\nThe student is currently studying a lesson titled "${lessonTitle}".`;
+    if (lessonContent) {
+      contextSnippet += ` The content of the lesson is: "${lessonContent}".`;
+    }
+    contextSnippet += ` Keep this lesson topic in mind and explain references relative to it.`;
+  }
 
   const systemInstruction = `You are a friendly, encouraging, and highly effective STEM tutor for rural students on the VidyaQuest platform.
 Your goal is to explain complex science and math concepts simply using relatable everyday examples.
-The student is asking you a question in ${targetLanguage}. You MUST reply ONLY in ${targetLanguage}.
+The student is asking you a question in ${targetLanguage}. You MUST reply ONLY in ${targetLanguage}.${contextSnippet}
 Do not give direct answers to homework or quizzes; instead, guide the student to understand the concept.
 Keep your responses concise, using bullet points and short paragraphs to make it easy to read on a mobile device. Include a supportive emoji!`;
 
@@ -829,20 +1544,47 @@ app.post('/api/scan-solve', auth, async (req, res) => {
   const mimeMatch = imageBase64.match(/^data:(image\/[a-z]+);base64,/);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
-  const systemPrompt = `You are VidyaQuest's expert STEM solver for rural Indian students (Grades 6-12).
-A student has taken a photo of a STEM problem from their textbook or handwritten notes.
-Analyze the image carefully and provide a clear, step-by-step solution.
+  const systemPrompt = `You are VidyaQuest's expert STEM tutor for rural Indian school students (Grades 6–12).
+A student has photographed a STEM problem from their textbook or handwritten notes.
+Your job is to solve it completely and explain every step so the student truly understands.
 
-Rules:
-- You MUST respond ONLY in ${targetLanguage}
-- Give a concise title/summary of what the problem is about
-- Show all working steps clearly numbered
-- Use simple language appropriate for school students
-- If this is a math problem, show all calculation steps
-- If it's a science question, explain the concept then answer
-- End with a key takeaway or tip to remember
-- Use relevant emojis to make it engaging
-- If you cannot read the image clearly, ask the student to retake with better lighting`;
+FORMATTING RULES (follow exactly):
+1. Respond ONLY in ${targetLanguage}.
+2. Start with a ## heading that names the topic (e.g. "## ⚛️ Newton's Second Law" or "## 🔢 Linear Equations").
+3. Directly below, write one sentence summarising what the problem is asking.
+4. Then write a ### Step-by-Step Solution section. Number every step clearly.
+5. ALL mathematical expressions MUST be wrapped in KaTeX/LaTeX delimiters:
+   - Inline expressions: $expression$ (e.g. $F = ma$, $x = 5$)
+   - Display (block) equations: $$expression$$ on its own line (e.g. $$\\frac{a+b}{c} = d$$)
+   - Never write bare equations without delimiters.
+6. After the solution, add a ### ✅ Final Answer section that states the answer clearly in a single line.
+7. End with a ### 💡 Key Takeaway section — one memorable tip or concept the student should remember.
+8. Use bullet points and numbered lists where helpful.
+9. Use emojis sparingly to make it engaging (e.g. ⚠️ for warnings, ✅ for correct steps, 💡 for tips).
+10. Keep language simple, warm, and encouraging — like a friendly senior student explaining to a junior.
+11. If the image is unclear or unreadable, respond only with: "📸 The image is a bit blurry! Please retake the photo in good lighting, holding the camera steady and close to the problem."
+
+EXAMPLE STRUCTURE:
+## 📐 Area of a Triangle
+
+The problem asks us to find the area of a triangle with base 8 cm and height 5 cm.
+
+### Step-by-Step Solution
+
+**Step 1: Write down the formula**
+$$\\text{Area} = \\frac{1}{2} \\times \\text{base} \\times \\text{height}$$
+
+**Step 2: Substitute the values**
+$$\\text{Area} = \\frac{1}{2} \\times 8 \\times 5$$
+
+**Step 3: Calculate**
+$$\\text{Area} = \\frac{40}{2} = 20 \\text{ cm}^2$$
+
+### ✅ Final Answer
+The area of the triangle is $20 \\text{ cm}^2$.
+
+### 💡 Key Takeaway
+Always divide by 2 when finding the area of a triangle — this is because a triangle is exactly half of a rectangle with the same base and height!`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -871,8 +1613,8 @@ Rules:
             ]
           }
         ],
-        temperature: 0.3,
-        max_tokens: 1024
+        temperature: 0.2,
+        max_tokens: 2048
       })
     });
 
@@ -1223,6 +1965,36 @@ io.use((socket, next) => {
 
 io.on('connection', (socket) => {
   console.log(`User connected to Socket.io: ${socket.user.name} (${socket.user.id})`);
+
+  // Collaborative Group Challenges socket events
+  socket.on('joinGroupRoom', ({ groupId }) => {
+    const roomName = `group_${groupId}`;
+    socket.join(roomName);
+    console.log(`User ${socket.user.name} joined group socket room: ${roomName}`);
+  });
+
+  socket.on('sendGroupMessage', ({ groupId, message }) => {
+    if (!groupId || !message || !message.trim()) return;
+    const roomName = `group_${groupId}`;
+    try {
+      db.prepare(`
+        INSERT INTO study_group_messages (group_id, user_id, message)
+        VALUES (?, ?, ?)
+      `).run(groupId, socket.user.id, message.trim());
+
+      io.to(roomName).emit('groupMessage', {
+        id: Date.now(),
+        group_id: groupId,
+        user_id: socket.user.id,
+        message: message.trim(),
+        sender_name: socket.user.name,
+        sender_avatar: socket.user.avatar,
+        created_at: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('[Socket] Error saving group chat:', err);
+    }
+  });
 
   socket.on('createRoom', ({ subjectCode }) => {
     // Generate 6-digit room code

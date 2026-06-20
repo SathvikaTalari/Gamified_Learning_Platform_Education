@@ -13,6 +13,12 @@ let socket = null;
 let battleRoomCode = null;
 let battleState = { questionsCount: 0, currentQuestionIndex: 0, players: [], timer: 10, answered: false };
 
+let currentSubjectCode = null;
+let currentSubjectName = '';
+let currentSubjectIcon = '';
+let currentSubjectColor = '';
+let currentSubjectDesc = '';
+
 const API = '';
 
 // ===== TRANSLATIONS =====
@@ -243,21 +249,27 @@ async function handleRegister() {
   if (selectedRole === 'student') {
     const grade = parseInt(document.getElementById('reg-grade').value);
     const school = document.getElementById('reg-school').value.trim();
-    const language = document.getElementById('reg-language').value;
+    const languageCheckboxes = document.querySelectorAll('.lang-checkbox:checked');
+    if (languageCheckboxes.length > 3 || languageCheckboxes.length === 0) { showAuthError('Please select exactly 1 to 3 languages'); return; }
+    const languages = Array.from(languageCheckboxes).map(cb => cb.value);
     if (!school) { showAuthError('Please enter your school name'); return; }
     if (!grade) { showAuthError('Please select your grade'); return; }
     body.grade = grade;
     body.school = school;
-    body.language = language;
+    body.languages = languages;
+    body.language = languages[0];
   } else {
     const department = document.getElementById('reg-department').value;
     const subject_specialization = document.getElementById('reg-specialization').value;
-    const language = document.getElementById('reg-teacher-language').value;
+    const languageCheckboxes = document.querySelectorAll('.teacher-lang-checkbox:checked');
+    if (languageCheckboxes.length > 3 || languageCheckboxes.length === 0) { showAuthError('Please select exactly 1 to 3 languages'); return; }
+    const languages = Array.from(languageCheckboxes).map(cb => cb.value);
     if (!department) { showAuthError('Please select your department'); return; }
     if (!subject_specialization) { showAuthError('Please select your subject specialization'); return; }
     body.department = department;
     body.subject_specialization = subject_specialization;
-    body.language = language;
+    body.languages = languages;
+    body.language = languages[0];
   }
 
   try {
@@ -269,9 +281,20 @@ async function handleRegister() {
 function loginSuccess(data) {
   currentToken = data.token;
   currentUser = data.user;
-  currentLanguage = currentUser.language || 'en';
+  
+  let prefs = ["en"];
+  try { if (currentUser.preferred_languages) prefs = JSON.parse(currentUser.preferred_languages); } catch(e) {}
+  currentUser.preferred_languages_array = prefs;
+  currentLanguage = prefs[0] || currentUser.language || 'en';
+  
   localStorage.setItem('vq_token', currentToken);
-  document.getElementById('lang-switcher').value = currentLanguage;
+  
+  const langSwitcher = document.getElementById('lang-switcher');
+  if (langSwitcher) {
+    const langNames = { 'en': 'EN', 'hi': 'हि', 'te': 'తె', 'mr': 'म', 'or': 'ଓଡ଼' };
+    langSwitcher.innerHTML = prefs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
+    langSwitcher.value = currentLanguage;
+  }
   document.getElementById('auth-screen').classList.remove('active');
   document.getElementById('auth-screen').classList.add('hidden');
   document.getElementById('main-screen').classList.remove('hidden');
@@ -343,6 +366,7 @@ function showScreen(name) {
   if (name === 'teacher-home') loadTeacherHome();
   if (name === 'create-lesson') loadCreateLessonForm();
   if (name === 'my-content') loadMyContent();
+  if (name === 'groups') loadGroups();
 
   // Cleanup multiplayer battle connection if navigating away from it
   if (['home', 'subjects', 'leaderboard', 'badges', 'profile'].includes(name)) {
@@ -415,7 +439,7 @@ async function loadHome() {
     const subjects = await api('/api/subjects');
     const container = document.getElementById('home-subjects');
     container.innerHTML = subjects.map(s => `
-      <div class="subject-home-card" onclick="openSubject(${s.id},'${s.name}','${s.icon}','${s.color}','${s.description}')">
+      <div class="subject-home-card" onclick="openSubject(${s.id},'${s.name}','${s.icon}','${s.color}','${s.description}','${s.code}')">
         <div class="subject-home-icon">${s.icon}</div>
         <div class="subject-home-info">
           <div class="subject-home-name" style="color:${s.color}">${s.name}</div>
@@ -556,7 +580,7 @@ async function loadSubjects() {
     const subjects = await api('/api/subjects');
     const grid = document.getElementById('subjects-grid');
     grid.innerHTML = subjects.map(s => `
-      <div class="subject-card" onclick="openSubject(${s.id},'${s.name}','${s.icon}','${s.color}','${s.description}')" style="border-color:${s.color}22;">
+      <div class="subject-card" onclick="openSubject(${s.id},'${s.name}','${s.icon}','${s.color}','${s.description}','${s.code}')" style="border-color:${s.color}22;">
         <div class="subject-card-icon">${s.icon}</div>
         <div class="subject-card-name" style="color:${s.color}">${s.name}</div>
         <div class="subject-card-desc">${s.description}</div>
@@ -568,9 +592,58 @@ async function loadSubjects() {
   } catch(e) { console.error(e); }
 }
 
-async function openSubject(id, name, icon, color, desc) {
+async function openSubject(id, name, icon, color, desc, code) {
   currentSubjectId = id;
-  showScreen('lessons');
+  currentSubjectCode = code;
+  currentSubjectName = name;
+  currentSubjectIcon = icon;
+  currentSubjectColor = color;
+  currentSubjectDesc = desc;
+  
+  // Set options screen header
+  const header = document.getElementById('subject-options-header');
+  if (header) {
+    header.style.background = `${color}22`;
+    header.style.borderLeft = `4px solid ${color}`;
+    header.innerHTML = `
+      <div class="lessons-header-icon">${icon}</div>
+      <div>
+        <div class="lessons-header-name" style="color:${color}">${name}</div>
+        <div class="lessons-header-desc">${desc}</div>
+      </div>
+    `;
+  }
+
+  // Set card colors or borders based on subject color
+  const lessonsCard = document.getElementById('mode-card-lessons');
+  const gamesCard = document.getElementById('mode-card-games');
+  if (lessonsCard) {
+    lessonsCard.style.borderColor = `${color}44`;
+  }
+  if (gamesCard) {
+    gamesCard.style.borderColor = `${color}44`;
+  }
+  
+  showScreen('subject-options');
+}
+
+async function selectLearningMode(mode) {
+  if (mode === 'lessons') {
+    await loadSubjectLessons();
+    showScreen('lessons');
+  } else if (mode === 'games') {
+    loadSubjectGames();
+    showScreen('subject-games');
+  }
+}
+
+async function loadSubjectLessons() {
+  const id = currentSubjectId;
+  const name = currentSubjectName;
+  const icon = currentSubjectIcon;
+  const color = currentSubjectColor;
+  const desc = currentSubjectDesc;
+
   const header = document.getElementById('lessons-header');
   header.style.background = `${color}22`;
   header.style.borderLeft = `4px solid ${color}`;
@@ -581,7 +654,7 @@ async function openSubject(id, name, icon, color, desc) {
     list.innerHTML = lessons.map((l, i) => {
       const done = l.userProgress?.completed;
       const diffClass = l.difficulty;
-      const title = currentLanguage==='hi' && l.title_hi ? l.title_hi : currentLanguage==='mr' && l.title_mr ? l.title_mr : currentLanguage==='or' && l.title_or ? l.title_or : l.title;
+      const title = currentLanguage==='hi' && l.title_hi ? l.title_hi : currentLanguage==='mr' && l.title_mr ? l.title_mr : currentLanguage==='te' && l.title_te ? l.title_te : l.title;
       return `
         <div class="lesson-card ${done?'completed':''}" onclick="openLesson(${l.id})">
           <div class="lesson-card-num" style="${done?'':'color:'+color}">${done?'✓':(i+1)}</div>
@@ -599,6 +672,73 @@ async function openSubject(id, name, icon, color, desc) {
       `;
     }).join('');
   } catch(e) { console.error(e); }
+}
+
+const SubjectGames = {
+  math: [
+    { id: 'mathflash', title: 'Math Flash', icon: '⚡', desc: 'Solve arithmetic equations against the clock! / तेज़ गणित समाधान!', xp: '+5 XP per answer' },
+    { id: 'numberpuzzle', title: 'Number Puzzle', icon: '🧩', desc: 'Find the patterns and solve number sequences. / संख्या पहेली!', xp: '+8 XP per puzzle' },
+    { id: 'mathkingdom', title: 'Math Kingdom Builder', icon: '🏰', desc: 'Solve math to build your own visual kingdom! / गणित साम्राज्य निर्माता!', xp: '+5 XP per building block' },
+    { id: 'escaperoom', title: 'Equation Escape Room', icon: '🔑', desc: 'Solve 5 equations under pressure to escape the room! / समीकरण एस्केप रूम!', xp: '+10 XP per escape' }
+  ],
+  science: [
+    { id: 'wordscience', title: 'Science Words', icon: '🔤', desc: 'Solve scientific vocabulary scrambles with clues. / विज्ञान के शब्द!', xp: '+3 XP per word' },
+    { id: 'chemlab', title: 'Virtual Chemistry Lab', icon: '🧪', desc: 'Mix chemicals and watch real reactions! Create experiments from Grade 6–12 syllabus. / रासायनिक प्रयोग करें!', xp: '+10 XP per experiment' },
+    { id: 'spacemission', title: 'Space Mission Control', icon: '🚀', desc: 'Become an ISRO scientist! Solve physics & chemistry problems to launch a rocket. / रॉकेट लॉन्च करें!', xp: '+15 XP per stage' },
+    { id: 'circuitbuilder', title: 'Circuit Builder', icon: '🔌', desc: 'Build circuits by unlocking electrical components and connecting them! / सर्किट बिल्डर!', xp: '+10 XP per correct circuit' }
+  ],
+  tech: [
+    { id: 'wordscience', title: 'Science Words', icon: '🔤', desc: 'Identify tech and internet vocabulary. / तकनीकी शब्द!', xp: '+3 XP per word' },
+    { id: 'numberpuzzle', title: 'Number Puzzle', icon: '🧩', desc: 'Reason through logical code patterns. / कोडिंग तर्क!', xp: '+8 XP per puzzle' }
+  ],
+  eng: [
+    { id: 'numberpuzzle', title: 'Number Puzzle', icon: '🧩', desc: 'Solve engineering and design pattern sequences. / इंजीनियरिंग पहेली!', xp: '+8 XP per puzzle' },
+    { id: 'mathflash', title: 'Math Flash', icon: '⚡', desc: 'Quick estimations and speed calculations. / गति गणना!', xp: '+5 XP per answer' }
+  ]
+};
+
+function loadSubjectGames() {
+  const code = currentSubjectCode || 'math';
+  const color = currentSubjectColor || 'var(--primary)';
+  const name = currentSubjectName || 'Subject';
+  const icon = currentSubjectIcon || '🎮';
+  
+  // Set header
+  const header = document.getElementById('subject-games-header');
+  if (header) {
+    header.style.background = `${color}22`;
+    header.style.borderLeft = `4px solid ${color}`;
+    header.innerHTML = `
+      <div class="lessons-header-icon">${icon}</div>
+      <div>
+        <div class="lessons-header-name" style="color:${color}">${name} Games / खेल</div>
+        <div class="lessons-header-desc">Play interactive mini-games to practice your STEM concepts!</div>
+      </div>
+    `;
+  }
+  
+  // Render games list
+  const grid = document.getElementById('subject-games-grid');
+  if (grid) {
+    const games = SubjectGames[code] || [];
+    if (games.length > 0) {
+      grid.innerHTML = games.map(g => `
+        <div class="game-card" style="border-left-color:${color};">
+          <span class="game-card-xp-badge">⚡ ${g.xp}</span>
+          <div class="game-card-header">
+            <span class="game-card-icon">${g.icon}</span>
+            <span class="game-card-title">${g.title}</span>
+          </div>
+          <p class="game-card-desc">${g.desc}</p>
+          <button class="btn-primary" onclick="launchGame('${g.id}')" style="width:100%; margin-top:auto; font-family:'Baloo 2', cursive; font-size:1rem; font-weight:700; background:linear-gradient(135deg, ${color}, var(--primary-dark)); border:none; padding:10px; border-radius:8px;">
+            Play Game 🎮
+          </button>
+        </div>
+      `).join('');
+    } else {
+      grid.innerHTML = '<div class="empty-state">No games available for this subject yet.</div>';
+    }
+  }
 }
 
 // ===== LESSON DETAIL =====
@@ -633,7 +773,7 @@ async function openLesson(id) {
       return;
     }
 
-    const title = currentLanguage==='hi' && lesson.title_hi ? lesson.title_hi : currentLanguage==='mr' && lesson.title_mr ? lesson.title_mr : currentLanguage==='or' && lesson.title_or ? lesson.title_or : lesson.title;
+    const title = currentLanguage==='hi' && lesson.title_hi ? lesson.title_hi : currentLanguage==='mr' && lesson.title_mr ? lesson.title_mr : currentLanguage==='te' && lesson.title_te ? lesson.title_te : lesson.title;
     const c = lesson.content || {};
     const color = lesson.subject_color || 'var(--primary)';
 
@@ -781,8 +921,8 @@ function renderQuestion() {
     qText = q.question_hi;
   } else if (currentLanguage === 'mr' && q.question_mr) {
     qText = q.question_mr;
-  } else if (currentLanguage === 'or' && q.question_or) {
-    qText = q.question_or;
+  } else if (currentLanguage === 'te' && q.question_te) {
+    qText = q.question_te;
   }
 
   const isFillBlank = q.option_b === '' || q.option_b === null || !['A', 'B', 'C', 'D'].includes(q.correct_answer);
@@ -1027,25 +1167,134 @@ async function loadProfile() {
           ${profile.badges.map(b => `<div class="badge-mini" title="${b.name}">${b.icon}</div>`).join('')}
         </div>
       </div>` : ''}
+      ${profile.kingdom_data ? `
+      <div class="profile-section" style="background:rgba(99,102,241,0.08);border:1.5px solid rgba(99,102,241,0.25);border-radius:16px;padding:1rem;">
+        <h3 style="margin-top:0;color:#818cf8;display:flex;align-items:center;gap:6px;">🏰 My Math Kingdom</h3>
+        <div style="display:flex;gap:1.5rem;align-items:center;flex-wrap:wrap;justify-content:center;">
+          <div style="display:grid;grid-template-columns:repeat(5, 1fr);gap:4px;background:rgba(0,0,0,0.2);padding:6px;border-radius:8px;width:130px;min-height:70px;">
+            ${(() => {
+              let parsed = {};
+              try { parsed = JSON.parse(profile.kingdom_data); } catch(e) {}
+              const towers = parseInt(parsed.towers) || 0;
+              const houses = parseInt(parsed.houses) || 0;
+              const land = parseInt(parsed.land) || 0;
+              
+              const items = [];
+              for(let i=0; i<towers; i++) items.push('🏰');
+              for(let i=0; i<houses; i++) items.push('🏠');
+              for(let i=0; i<Math.floor(land/5); i++) items.push('🌳');
+              while(items.length < 15) items.push('⬜');
+              return items.slice(0, 15).map(item => `<div style="font-size:0.9rem;text-align:center;">${item}</div>`).join('');
+            })()}
+          </div>
+          <div style="font-size:0.8rem;color:var(--text2);flex:1;min-width:110px;">
+            ${(() => {
+              let parsed = {};
+              try { parsed = JSON.parse(profile.kingdom_data); } catch(e) {}
+              const towers = parseInt(parsed.towers) || 0;
+              const houses = parseInt(parsed.houses) || 0;
+              const land = parseInt(parsed.land) || 0;
+              const gold = parseInt(parsed.gold) || 0;
+              const size = (towers * 3) + (houses * 2) + land;
+              return `
+                <div>🏰 Towers: <strong>${towers}</strong></div>
+                <div>🏠 Houses: <strong>${houses}</strong></div>
+                <div>🌳 Land Size: <strong>${land}</strong></div>
+                <div>🪙 Treasury: <strong>${gold} Gold</strong></div>
+                <div style="margin-top:4px;font-size:0.85rem;color:#818cf8;font-weight:bold;">🏆 Kingdom Rating: ${size}</div>
+              `;
+            })()}
+          </div>
+        </div>
+      </div>` : ''}
       <div class="profile-section">
         <h3>📊 Stats</h3>
         <div style="color:var(--text2);font-size:0.88rem;line-height:1.8;">
           <div>🔥 Login Streak: <strong>${profile.streak || 0} days</strong></div>
           <div>🏅 Current Level: <strong>Level ${level}</strong></div>
-          <div>🎭 Role: <strong>${isTeacher ? 'Teacher' : 'Student'}</strong></div>
+          <div>🎢 Role: <strong>${isTeacher ? 'Teacher' : 'Student'}</strong></div>
           ${isTeacher
-            ? `<div>🏛️ Department: <strong>${profile.department}</strong></div>
+            ? `<div>🏗️ Department: <strong>${profile.department}</strong></div>
                <div>🎯 Specialization: <strong>${profile.subject_specialization}</strong></div>`
-            : `<div>🏫 School: <strong>${profile.school || 'Not set'}</strong></div>
-               <div>📚 Grade: <strong>Grade ${profile.grade}</strong></div>`
+            : `<div>🏢 School: <strong>${profile.school || 'Not set'}</strong></div>
+               <div>📚 Grade: <strong>Grade ${profile.grade}</strong></div>
+               <div>🔑 Escape Room: <strong>${profile.escape_room_time && profile.escape_room_time < 9999 ? profile.escape_room_time + 's (Best)' : 'No escape yet'}</strong></div>`
           }
           <div>🌐 Language: <strong>${{en:'English',hi:'हिंदी',mr:'मराठी',or:'ଓଡ଼ିଆ'}[profile.language]||'English'}</strong></div>
           <div>📅 Joined: <strong>${new Date(profile.created_at).toLocaleDateString()}</strong></div>
         </div>
       </div>
-      <button class="logout-btn" onclick="logout()">🚪 Logout</button>
+      ${!isTeacher ? `
+      <div class="profile-section">
+        <button class="btn-primary" style="width:100%;" onclick="showScreen('my-focus');loadMyFocusHistory();">
+          🧠 View My Focus History
+        </button>
+      </div>` : ''}
+      <button class="logout-btn" onclick="logout()">🚩 Logout</button>
     `;
   } catch(e) { console.error(e); }
+}
+
+// ===== STUDENT FOCUS HISTORY =====
+async function loadMyFocusHistory() {
+  const listEl = document.getElementById('mf-lessons-list');
+  const fmtTime = (s) => {
+    const m = Math.floor(s/60);
+    const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+  try {
+    const data = await api('/api/focus/my-history');
+    const { lessons, totals } = data;
+
+    // Fill overall stats
+    document.getElementById('mf-total-focus').textContent  = fmtTime(totals.total_focus);
+    document.getElementById('mf-total-events').textContent = totals.total_events;
+    document.getElementById('mf-best-streak').textContent  = fmtTime(totals.best_streak);
+    document.getElementById('mf-total-xp').textContent     = `+${totals.total_xp} XP`;
+
+    if (!lessons.length) {
+      listEl.innerHTML = '<div class="empty-state">💭 No focus data yet. Start a lesson with Smart Focus enabled!</div>';
+      return;
+    }
+
+    listEl.innerHTML = lessons.map(l => {
+      const eff = l.efficiency;
+      const effColor = eff >= 75 ? '#22c55e' : eff >= 50 ? '#f59e0b' : '#ef4444';
+      const effLabel = eff >= 75 ? '🟢' : eff >= 50 ? '🟡' : '🔴';
+      const focusMin = Math.round(l.focus_seconds / 60 * 10) / 10;
+      const distMin  = Math.round(l.distracted_seconds / 60 * 10) / 10;
+      const streakMin = Math.floor(l.longest_focus_streak / 60);
+      const streakSec = l.longest_focus_streak % 60;
+      const date = l.updated_at ? new Date(l.updated_at).toLocaleDateString() : '';
+
+      return `
+        <div class="mf-lesson-card" style="border-left-color:${l.subject_color}">
+          <div class="mf-lesson-header">
+            <span class="mf-lesson-icon">${l.subject_icon}</span>
+            <div style="flex:1">
+              <div class="mf-lesson-title">${l.lesson_title}</div>
+              <div class="mf-lesson-subject" style="color:${l.subject_color}">${l.subject_name} · ${date}</div>
+            </div>
+            <span class="mf-eff-badge" style="color:${effColor};border-color:${effColor}22;background:${effColor}11">
+              ${effLabel} ${eff}%
+            </span>
+          </div>
+          <div class="mf-lesson-stats">
+            <span>⏱️ Focus: ${focusMin}m</span>
+            <span>👀 Distractions: ${l.distraction_events}</span>
+            <span>🏆 Best Streak: ${streakMin}m ${streakSec}s</span>
+            <span>⚡ +${l.focus_xp_awarded} XP</span>
+          </div>
+          <div class="mf-bar-track">
+            <div class="mf-bar-focus" style="width:${eff}%;background:${effColor};"></div>
+          </div>
+        </div>`;
+    }).join('');
+  } catch(e) {
+    console.error('loadMyFocusHistory error:', e);
+    listEl.innerHTML = '<div class="empty-state">⚠️ Could not load focus history.</div>';
+  }
 }
 
 // ===== BADGE MODAL =====
@@ -1188,46 +1437,161 @@ async function loadTeacherHome() {
       subFeedEl.innerHTML = '<div class="empty-state">No quiz submissions yet.</div>';
     }
 
-    // Student Focus Metrics
+    // Student Focus Metrics — Enhanced
     const focusEl = document.getElementById('t-focus-metrics');
     if (focusEl) {
       if (dash.studentFocusMetrics && dash.studentFocusMetrics.length) {
         focusEl.innerHTML = dash.studentFocusMetrics.map(s => {
-          const totalMin = Math.round((s.total_focus + s.total_distracted) / 60);
-          const focusMin = Math.round(s.total_focus / 60);
-          const distractedMin = Math.round(s.total_distracted / 60);
-          const efficiency = s.efficiency;
-          
+          const focusMin        = Math.round(s.total_focus / 60);
+          const distractedMin   = Math.round(s.total_distracted / 60);
+          const efficiency      = s.efficiency;
+          const bestStreakMin   = Math.floor(s.best_streak / 60);
+          const bestStreakSec   = s.best_streak % 60;
+          const isAtRisk        = efficiency < 50 || s.total_distraction_events >= 10;
+          const effColor        = efficiency >= 75 ? '#22c55e' : efficiency >= 50 ? '#f59e0b' : '#ef4444';
+
           return `
-            <div class="t-focus-item">
+            <div class="t-focus-item${isAtRisk ? ' t-focus-at-risk' : ''}">
               <div class="t-focus-header">
                 <span class="t-focus-avatar">${s.avatar || '🧑‍🎓'}</span>
-                <div>
-                  <div class="t-focus-name">${s.name}</div>
+                <div style="flex:1">
+                  <div class="t-focus-name">${s.name} ${isAtRisk ? '<span class="t-risk-flag">🚨 Attention Needed</span>' : ''}</div>
                   <div class="t-focus-sub">Grade ${s.grade || '6'} · ${s.school || 'Unknown School'}</div>
                 </div>
-                <span class="t-focus-score-meta">${efficiency}% Efficiency</span>
+                <span class="t-focus-score-meta" style="color:${effColor}">${efficiency}% Efficiency</span>
               </div>
               <div class="t-focus-bars-wrap">
                 <div class="t-focus-bar-label">
-                  <span>Focus: ${focusMin}m (${Math.round(s.total_focus)}s)</span>
-                  <span>Distracted: ${distractedMin}m (${Math.round(s.total_distracted)}s)</span>
+                  <span>⏱️ Focus: ${focusMin}m</span>
+                  <span>👀 Distractions: ${s.total_distraction_events}</span>
+                  <span>🏆 Best Streak: ${bestStreakMin}m ${bestStreakSec}s</span>
                 </div>
                 <div class="sf-efficiency-track" title="Focus efficiency: ${efficiency}%">
-                  <div class="sf-efficiency-fill" style="width: ${efficiency}%"></div>
+                  <div class="sf-efficiency-fill" style="width: ${efficiency}%; background: ${effColor};"></div>
                 </div>
               </div>
+              <button class="t-view-detail-btn" onclick="showStudentFocusDetail(${s.id}, '${s.name}', '${s.avatar || '🧑‍🎓'}')"
+                style="margin-top:0.5rem;width:100%;background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:8px;padding:0.4rem;font-family:'Nunito',sans-serif;cursor:pointer;font-size:0.8rem;">
+                📊 View Lesson Breakdown
+              </button>
             </div>
           `;
         }).join('');
       } else {
         focusEl.innerHTML = '<div class="empty-state">No focus data recorded yet.</div>';
       }
+
+      // Focus Risk Summary Banner
+      if (dash.focusRiskStudents && dash.focusRiskStudents.length) {
+        const riskBanner = document.createElement('div');
+        riskBanner.className = 't-focus-risk-banner';
+        riskBanner.innerHTML = `
+          <span>🚨 <strong>${dash.focusRiskStudents.length} student${dash.focusRiskStudents.length > 1 ? 's' : ''}</strong> need attention: ${dash.focusRiskStudents.map(s => s.name.split(' ')[0]).join(', ')}</span>`;
+        focusEl.insertAdjacentElement('beforebegin', riskBanner);
+      }
     }
+
+    // Load collaborative group challenges stats
+    await loadTeacherChallenges();
 
   } catch(e) {
     console.error('Teacher dashboard error:', e);
     showToast('⚠️ Could not load dashboard data');
+  }
+}
+
+// ===== TEACHER: Student Focus Detail Modal =====
+async function showStudentFocusDetail(studentId, name, avatar) {
+  const fmtTime = (s) => {
+    const m = Math.floor(s / 60); const sec = s % 60;
+    return m > 0 ? `${m}m ${sec}s` : `${sec}s`;
+  };
+  // Create or reuse modal
+  let modal = document.getElementById('t-student-detail-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 't-student-detail-modal';
+    modal.className = 'sf-modal';
+    modal.style.zIndex = '2500';
+    modal.innerHTML = `<div class="sf-modal-box t-detail-box" style="max-width:640px;width:95%;max-height:85vh;overflow-y:auto;"><div id="t-detail-content"></div></div>`;
+    modal.addEventListener('click', e => { if (e.target === modal) modal.style.display = 'none'; });
+    document.body.appendChild(modal);
+  }
+  modal.style.display = 'flex';
+  document.getElementById('t-detail-content').innerHTML = '<div style="text-align:center;padding:2rem;color:var(--text-muted);">Loading...</div>';
+
+  try {
+    const data = await api(`/api/teacher/student/${studentId}/focus`);
+    const { totals, lessons } = data;
+    const eff = totals.total_focus + totals.total_distracted > 0
+      ? Math.round(totals.total_focus / (totals.total_focus + totals.total_distracted) * 100)
+      : 100;
+    const effColor = eff >= 75 ? '#22c55e' : eff >= 50 ? '#f59e0b' : '#ef4444';
+
+    document.getElementById('t-detail-content').innerHTML = `
+      <div style="font-family:'Baloo 2',sans-serif;">
+        <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1rem;">
+          <span style="font-size:2rem;">${avatar}</span>
+          <div style="flex:1">
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text);">${name}</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);">Focus Analytics — All Sessions</div>
+          </div>
+          <button onclick="document.getElementById('t-student-detail-modal').style.display='none'"
+            style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">✕</button>
+        </div>
+
+        <!-- Overview Stats -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:1rem;">
+          <div class="mf-stat-card" style="text-align:center;">
+            <div style="font-size:1.2rem;font-weight:800;color:#22c55e;">${fmtTime(totals.total_focus)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">Total Focus</div>
+          </div>
+          <div class="mf-stat-card" style="text-align:center;">
+            <div style="font-size:1.2rem;font-weight:800;color:#ef4444;">${totals.total_events}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">Distractions</div>
+          </div>
+          <div class="mf-stat-card" style="text-align:center;">
+            <div style="font-size:1.2rem;font-weight:800;color:#a855f7;">${fmtTime(totals.best_streak)}</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">Best Streak</div>
+          </div>
+          <div class="mf-stat-card" style="text-align:center;">
+            <div style="font-size:1.2rem;font-weight:800;color:${effColor};">${eff}%</div>
+            <div style="font-size:0.7rem;color:var(--text-muted);">Efficiency</div>
+          </div>
+        </div>
+
+        <!-- Per-lesson table -->
+        <div style="font-size:0.78rem;font-weight:700;color:var(--text-muted);margin-bottom:0.5rem;">📚 PER-LESSON BREAKDOWN</div>
+        ${lessons.length === 0 ? '<div class="empty-state">No lesson focus data yet.</div>' : `
+        <div style="overflow-x:auto;">
+          <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+            <thead>
+              <tr style="color:var(--text-muted);text-align:left;border-bottom:1px solid var(--border);">
+                <th style="padding:0.4rem 0.6rem;">Lesson</th>
+                <th style="padding:0.4rem;">Focus</th>
+                <th style="padding:0.4rem;">👀</th>
+                <th style="padding:0.4rem;">Streak</th>
+                <th style="padding:0.4rem;">Eff%</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${lessons.map(l => {
+                const lEff = l.efficiency;
+                const lColor = lEff >= 75 ? '#22c55e' : lEff >= 50 ? '#f59e0b' : '#ef4444';
+                return `<tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                  <td style="padding:0.4rem 0.6rem;">${l.subject_icon} ${l.lesson_title}</td>
+                  <td style="padding:0.4rem;color:#22c55e;">${Math.round(l.focus_seconds/60)}m</td>
+                  <td style="padding:0.4rem;color:#ef4444;">${l.distraction_events}</td>
+                  <td style="padding:0.4rem;color:#a855f7;">${Math.floor(l.longest_focus_streak/60)}m ${l.longest_focus_streak%60}s</td>
+                  <td style="padding:0.4rem;font-weight:700;color:${lColor};">${lEff}%</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>`}
+      </div>`;
+  } catch(e) {
+    document.getElementById('t-detail-content').innerHTML = '<div class="empty-state">⚠️ Could not load student focus data.</div>';
   }
 }
 
@@ -1526,7 +1890,7 @@ const langVoiceMap = {
   en: ['en-IN', 'en-US', 'en-GB'],
   hi: ['hi-IN', 'hi-GB'],
   mr: ['mr-IN'],
-  or: ['or-IN', 'hi-IN']
+  te: ['te-IN', 'en-IN']
 };
 
 const vocabWords = {
@@ -1620,7 +1984,7 @@ function updateSpeechUIState(speaking) {
       let readText = '🔊 Read Aloud';
       if (currentLanguage === 'hi') readText = '🔊 पाठ सुनें';
       else if (currentLanguage === 'mr') readText = '🔊 धडा वाचा';
-      else if (currentLanguage === 'or') readText = '🔊 ପାଠ ପଢନ୍ତୁ';
+      else if (currentLanguage === 'te') readText = '🔊 ପାଠ ପଢନ୍ତୁ';
       readLessonBtn.innerHTML = readText;
       readLessonBtn.classList.remove('btn-speech-active');
     }
@@ -1664,7 +2028,7 @@ function readLessonAloud() {
     if (concepts.length) textToRead += `महत्त्वाच्या संकल्पना: ${concepts.join('. ')}. `;
     if (exampleText) textToRead += `उदाहरण: ${exampleText}. `;
     if (funfactText) textToRead += `मजेदार तथ्य: ${funfactText}. `;
-  } else if (currentLanguage === 'or') {
+  } else if (currentLanguage === 'te') {
     textToRead = `ପାଠର ଶୀର୍ଷକ: ${lessonHeroTitle}. `;
     if (introText) textToRead += `ଉପକ୍ରମ: ${introText}. `;
     if (concepts.length) textToRead += `ମୁଖ୍ୟ ବିଷୟବସ୍ତୁ: ${concepts.join('. ')}. `;
@@ -1695,8 +2059,8 @@ function readQuizQuestionAloud() {
     qText = q.question_hi;
   } else if (currentLanguage === 'mr' && q.question_mr) {
     qText = q.question_mr;
-  } else if (currentLanguage === 'or' && q.question_or) {
-    qText = q.question_or;
+  } else if (currentLanguage === 'te' && q.question_te) {
+    qText = q.question_te;
   }
   
   let textToRead = "";
@@ -1707,7 +2071,7 @@ function readQuizQuestionAloud() {
       textToRead = `खाली स्थान भरें: ${qText}. अपना उत्तर टाइप करें या बोलें.`;
     } else if (currentLanguage === 'mr') {
       textToRead = `रिकामी जागा भरा: ${qText}. तुमचे उत्तर टाइप करा किंवा बोला.`;
-    } else if (currentLanguage === 'or') {
+    } else if (currentLanguage === 'te') {
       textToRead = `ଶୂନ୍ୟସ୍ଥାନ ପୂରଣ କରନ୍ତୁ: ${qText}. ଆପଣଙ୍କ ଉତ୍ତର ଟାଇପ୍ କରନ୍ତୁ କିମ୍ବା କୁହନ୍ତୁ.`;
     } else {
       textToRead = `Fill in the blank: ${qText}. Type or speak your answer.`;
@@ -1717,7 +2081,7 @@ function readQuizQuestionAloud() {
       textToRead = `प्रश्न: ${qText}. विकल्प ए: ${q.option_a}. विकल्प बी: ${q.option_b}. विकल्प सी: ${q.option_c}. विकल्प डी: ${q.option_d}.`;
     } else if (currentLanguage === 'mr') {
       textToRead = `प्रश्न: ${qText}. पर्याय ए: ${q.option_a}. पर्याय बी: ${q.option_b}. पर्याय सी: ${q.option_c}. पर्याय डी: ${q.option_d}.`;
-    } else if (currentLanguage === 'or') {
+    } else if (currentLanguage === 'te') {
       textToRead = `ପ୍ରଶ୍ନ: ${qText}. ବିକଳ୍ପ ଏ: ${q.option_a}. ବିକଳ୍ପ ବି: ${q.option_b}. ବିକଳ୍ପ ସି: ${q.option_c}. ବିକଳ୍ପ ଡି: ${q.option_d}.`;
     } else {
       textToRead = `Question: ${qText}. Option A: ${q.option_a}. Option B: ${q.option_b}. Option C: ${q.option_c}. Option D: ${q.option_d}.`;
@@ -1739,7 +2103,7 @@ function startQuizSpeechRecognition() {
   }
   
   recognition = new SpeechRecognition();
-  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'or' ? 'or-IN' : 'en-US';
+  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'te' ? 'or-IN' : 'en-US';
   recognition.interimResults = false;
   recognition.maxAlternatives = 1;
   
@@ -1865,7 +2229,7 @@ function startMcqSpeechRecognition() {
   }
   
   recognition = new SpeechRecognition();
-  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'or' ? 'or-IN' : 'en-US';
+  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'te' ? 'or-IN' : 'en-US';
   recognition.interimResults = false;
   
   recognition.onstart = () => {
@@ -1953,7 +2317,7 @@ function startChatSpeechRecognition() {
   }
   
   recognition = new SpeechRecognition();
-  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'or' ? 'or-IN' : 'en-US';
+  recognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'te' ? 'or-IN' : 'en-US';
   recognition.interimResults = false;
   
   recognition.onstart = () => {
@@ -2256,6 +2620,62 @@ function retakePhoto() {
   startCamera();
 }
 
+function renderSTEMContent(text, element) {
+  // 1. Extract math blocks to prevent markdown parser from interfering
+  const mathBlocks = [];
+  let placeholderCounter = 0;
+
+  // Match display math: $$...$$ or \[...\]
+  const displayRegex = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g;
+  let processedText = text.replace(displayRegex, (match) => {
+    const placeholder = `___MATH_DISPLAY_PLACEHOLDER_${placeholderCounter}___`;
+    mathBlocks.push({ placeholder, content: match, display: true });
+    placeholderCounter++;
+    return placeholder;
+  });
+
+  // Match inline math: $...$ or \(...\)
+  const inlineRegex = /(\$[^\$\n]+?\$|\\\([\s\S]*?\\\))/g;
+  processedText = processedText.replace(inlineRegex, (match) => {
+    const placeholder = `___MATH_INLINE_PLACEHOLDER_${placeholderCounter}___`;
+    mathBlocks.push({ placeholder, content: match, display: false });
+    placeholderCounter++;
+    return placeholder;
+  });
+
+  // 2. Parse Markdown
+  let html = '';
+  if (typeof marked !== 'undefined' && marked.parse) {
+    html = marked.parse(processedText);
+  } else if (typeof marked === 'function') {
+    html = marked(processedText);
+  } else {
+    // Basic fallback if marked is not available
+    html = processedText.replace(/\n/g, '<br>');
+  }
+
+  // 3. Put math blocks back in the generated HTML
+  mathBlocks.forEach(item => {
+    html = html.replace(item.placeholder, item.content);
+  });
+
+  // 4. Set innerHTML
+  element.innerHTML = html;
+
+  // 5. Trigger KaTeX Auto-Render
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(element, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false},
+        {left: '\\(', right: '\\)', display: false},
+        {left: '\\[', right: '\\]', display: true}
+      ],
+      throwOnError: false
+    });
+  }
+}
+
 async function submitScanSolve() {
   if (!scanCapturedImage) {
     showToast('⚠️ Please capture or upload an image first.');
@@ -2281,7 +2701,9 @@ async function submitScanSolve() {
 
     const solution = result.solution || 'Could not generate a solution. Please try again.';
 
-    if (solutionBody) solutionBody.textContent = solution;
+    if (solutionBody) {
+      renderSTEMContent(solution, solutionBody);
+    }
     if (solutionDiv) solutionDiv.style.display = 'block';
     if (tips) tips.style.display = 'none';
 
@@ -2307,8 +2729,33 @@ function speakSolution() {
   const solutionBody = document.getElementById('solution-body');
   const btn = document.getElementById('btn-speak-solution');
   if (!solutionBody) return;
-  const text = solutionBody.textContent.trim();
-  if (!text) return;
+  const rawText = solutionBody.textContent.trim();
+  if (!rawText) return;
+
+  // Clean LaTeX notation for cleaner text-to-speech
+  let cleanText = rawText
+    .replace(/\\left\[/g, '[')
+    .replace(/\\right\]/g, ']')
+    .replace(/\\left\(/g, '(')
+    .replace(/\\right\)/g, ')')
+    .replace(/\\frac\{(.*?)\}\{(.*?)\}/g, '$1 over $2')
+    .replace(/\\cdot/g, ' times ')
+    .replace(/\\times/g, ' times ')
+    .replace(/\\pm/g, ' plus or minus ')
+    .replace(/\\approx/g, ' approximately ')
+    .replace(/\\sqrt\{(.*?)\}/g, ' square root of $1 ')
+    .replace(/\\pi/g, ' pi ')
+    .replace(/\\theta/g, ' theta ')
+    .replace(/\\Delta/g, ' delta ')
+    .replace(/\\Sigma/g, ' sigma ')
+    .replace(/\\infty/g, ' infinity ')
+    .replace(/\\le/g, ' less than or equal to ')
+    .replace(/\\ge/g, ' greater than or equal to ')
+    .replace(/\\ne/g, ' not equal to ')
+    .replace(/\\left/g, '')
+    .replace(/\\right/g, '')
+    .replace(/\\/g, ' ')
+    .replace(/[\n\r]+/g, ' ');
 
   if (window.speechSynthesis.speaking) {
     window.speechSynthesis.cancel();
@@ -2316,10 +2763,10 @@ function speakSolution() {
     return;
   }
 
-  const utterance = new SpeechSynthesisUtterance(text);
+  const utterance = new SpeechSynthesisUtterance(cleanText);
   utterance.lang = currentLanguage === 'hi' ? 'hi-IN'
     : currentLanguage === 'mr' ? 'mr-IN'
-    : currentLanguage === 'or' ? 'or-IN'
+    : currentLanguage === 'te' ? 'or-IN'
     : 'en-US';
   utterance.rate = 0.9;
   utterance.onstart = () => { if (btn) btn.innerHTML = '🛑 Stop'; };
@@ -2451,7 +2898,7 @@ function initSocket() {
     let qText = question.question;
     if (currentLanguage === 'hi' && question.question_hi) qText = question.question_hi;
     else if (currentLanguage === 'mr' && question.question_mr) qText = question.question_mr;
-    else if (currentLanguage === 'or' && question.question_or) qText = question.question_or;
+    else if (currentLanguage === 'te' && question.question_te) qText = question.question_te;
 
     document.getElementById('arena-q-text').textContent = qText;
 
@@ -2704,7 +3151,7 @@ function saveOfflineLesson(lesson, questions, hints) {
         title: lesson.title,
         title_hi: lesson.title_hi,
         title_mr: lesson.title_mr,
-        title_or: lesson.title_or,
+        title_te: lesson.title_te,
         content: lesson.content,
         grade: lesson.grade,
         difficulty: lesson.difficulty,
@@ -2948,7 +3395,7 @@ async function displayOfflineHint() {
         let hintText = matchedHint.hint_en;
         if (currentLanguage === 'hi' && matchedHint.hint_hi) hintText = matchedHint.hint_hi;
         else if (currentLanguage === 'mr' && matchedHint.hint_mr) hintText = matchedHint.hint_mr;
-        else if (currentLanguage === 'or' && matchedHint.hint_or) hintText = matchedHint.hint_or;
+        else if (currentLanguage === 'te' && matchedHint.hint_te) hintText = matchedHint.hint_te;
         
         const hintEl = document.getElementById('quiz-offline-hint');
         if (hintEl) {
@@ -3005,6 +3452,14 @@ const SmartFocus = {
   continuousFocusSeconds: 0,
   sessionTimerInterval: null,
 
+  // --- Enhanced Focus Tracking ---
+  distractionEvents: 0,            // Count of distinct distraction onset events
+  longestFocusStreak: 0,           // Longest continuous focus run (seconds)
+  currentFocusStreak: 0,           // Running current streak counter
+  focusXpAwarded: 0,               // Total focus XP given this session
+  wasDistracted: false,            // Previous tick distraction state (for edge detection)
+  milestonesFired: new Set(),      // Which milestones (5,10,15 min) already fired
+
   // --- Offline Local Tracking State ---
   localInterval: null,
   cascadeLoaded: false,
@@ -3016,6 +3471,9 @@ const SmartFocus = {
   slouchCounter: 0,
   lastOnlineAnalysisTime: 0,       // Timestamp of last online API result
   lastTriggeredEmotion: null,      // Tracks last triggered logic emotion to prevent spam
+  frustrationPopupActive: false,
+  frustRecognition: null,
+  frustIsListening: false,
 
   // Emoji map for emotion badge
   EMOTION_EMOJI: {
@@ -3046,6 +3504,346 @@ const SmartFocus = {
   },
 
   _interventionIndex: { bored: 0, distracted: 0, confused: 0, frustrated: 0 },
+
+  // --- Voice AI for Frustration ---
+  triggerFrustrationAI() {
+    if (this.frustrationPopupActive || this.popupDismissed) return;
+    this.frustrationPopupActive = true;
+
+    const popup = document.getElementById('sf-frustration-popup');
+    if (!popup) return;
+
+    popup.classList.remove('sf-hidden');
+
+    const historyEl = document.getElementById('sf-frust-chat-history');
+    if (historyEl) historyEl.innerHTML = '';
+
+    const greetings = {
+      en: "It looks like you are feeling a bit frustrated. Do you need any help? Just speak to tell me what's bothering you!",
+      hi: "ऐसा लगता है कि आप थोड़े परेशान हैं। क्या आपको कोई मदद चाहिए? बस बोलकर मुझे बताएं कि आपको क्या समस्या है!",
+      mr: "असे वाटते की आपण थोडे निराश आहात. आपल्याला काही मदत हवी आहे का? फक्त बोलून मला सांगा की काय अडचण आहे!",
+      or: "ଲାଗୁଛି ଆପଣ ଟିକେ ବିରକ୍ତ ଅଛନ୍ତି | ଆପଣଙ୍କୁ କୌଣସି ସାହାଯ୍ୟ ଦରକାର କି? କେବଳ କହିକରି ମୋତେ ଜଣାନ୍ତୁ ଆପଣଙ୍କର ଅସୁବିଧା କଣ!"
+    };
+
+    const text = greetings[currentLanguage] || greetings.en;
+
+    // Show AI bubble
+    const aiBubble = document.createElement('div');
+    aiBubble.className = 'sf-chat-bubble ai-bubble';
+    aiBubble.id = 'sf-frust-ai-text';
+    aiBubble.textContent = text;
+    if (historyEl) historyEl.appendChild(aiBubble);
+
+    const statusEl = document.getElementById('sf-frust-status-text');
+    if (statusEl) statusEl.innerHTML = "🤖 <span>AI is speaking...</span>";
+    
+    const pulseEl = document.querySelector('.sf-frust-pulse');
+    if (pulseEl) pulseEl.style.display = 'block';
+
+    // Disable mic button during AI speech to prevent collision
+    const micBtn = document.getElementById('sf-frust-mic-btn');
+    if (micBtn) micBtn.disabled = true;
+
+    this.speakTextWithCallback(text, currentLanguage, () => {
+      if (micBtn) micBtn.disabled = false;
+      if (statusEl) statusEl.innerHTML = "🎤 <span>Listening...</span>";
+      // Delay speech recognition by 500ms to allow audio output stream to release/close
+      setTimeout(() => this.startSpeechRecognition(), 500);
+    });
+  },
+
+  closeFrustrationAI() {
+    this.stopSpeechRecognition();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    const popup = document.getElementById('sf-frustration-popup');
+    if (popup) popup.classList.add('sf-hidden');
+
+    this.frustrationPopupActive = false;
+    this.popupDismissed = true;
+
+    // 2 minutes cooldown before AI pops up again
+    setTimeout(() => {
+      this.popupDismissed = false;
+    }, 120000);
+  },
+
+  speakTextWithCallback(text, lang, callback) {
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
+    if (!window.speechSynthesis) {
+      if (callback) callback();
+      return;
+    }
+    const SpeechSynthesisUtterance = window.SpeechSynthesisUtterance || window.webkitSpeechSynthesisUtterance;
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const targetLanguages = langVoiceMap[lang] || ['en-US'];
+
+    let selectedVoice = null;
+    for (const targetLang of targetLanguages) {
+      selectedVoice = voices.find(v => v.lang.toLowerCase() === targetLang.toLowerCase() || v.lang.toLowerCase().startsWith(targetLang.toLowerCase()));
+      if (selectedVoice) break;
+    }
+
+    if (!selectedVoice) {
+      const langPrefix = lang.split('-')[0].toLowerCase();
+      selectedVoice = voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+    }
+
+    if (selectedVoice) utterance.voice = selectedVoice;
+    utterance.rate = 0.9;
+    utterance.pitch = 1.0;
+
+    utterance.onend = () => {
+      if (callback) callback();
+    };
+
+    utterance.onerror = () => {
+      if (callback) callback();
+    };
+
+    window.speechSynthesis.speak(utterance);
+  },
+
+  startSpeechRecognition() {
+    // If already listening, treat clicking mic as a toggle to stop listening
+    if (this.frustIsListening) {
+      this.stopSpeechRecognition();
+      const statusEl = document.getElementById('sf-frust-status-text');
+      if (statusEl) statusEl.innerHTML = "😊 <span>Ready</span>";
+      return;
+    }
+
+    this.stopSpeechRecognition();
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      showToast("⚠️ Speech recognition is not supported in this browser.");
+      return;
+    }
+
+    this.frustRecognition = new SpeechRecognition();
+    this.frustRecognition.lang = currentLanguage === 'hi' ? 'hi-IN' : currentLanguage === 'mr' ? 'mr-IN' : currentLanguage === 'te' ? 'or-IN' : 'en-US';
+    this.frustRecognition.interimResults = false;
+
+    this.frustRecognition.onstart = () => {
+      this.frustIsListening = true;
+      const statusEl = document.getElementById('sf-frust-status-text');
+      if (statusEl) statusEl.innerHTML = "🎤 <span>Listening...</span>";
+      const waveEl = document.getElementById('sf-frust-wave');
+      if (waveEl) waveEl.classList.remove('hidden');
+      const micBtn = document.getElementById('sf-frust-mic-btn');
+      if (micBtn) {
+        micBtn.innerHTML = '🛑 Stop';
+        micBtn.classList.add('active');
+      }
+    };
+
+    this.frustRecognition.onresult = async (event) => {
+      const speechResult = event.results[0][0].transcript;
+      if (!speechResult) return;
+
+      this.stopSpeechRecognition();
+
+      // Append student query bubble
+      const historyEl = document.getElementById('sf-frust-chat-history');
+      if (historyEl) {
+        const studentBubble = document.createElement('div');
+        studentBubble.className = 'sf-chat-bubble student-bubble';
+        studentBubble.textContent = speechResult;
+        historyEl.appendChild(studentBubble);
+        historyEl.scrollTop = historyEl.scrollHeight;
+      }
+
+      const statusEl = document.getElementById('sf-frust-status-text');
+      if (statusEl) statusEl.innerHTML = "🧠 <span>Thinking...</span>";
+
+      // Call API with active lesson content context if available
+      let lessonTitle = '';
+      let lessonContent = '';
+      if (typeof currentLessonId !== 'undefined' && currentLessonId) {
+        const activeLessonEl = document.getElementById('lesson-title-display') || document.querySelector('.lesson-card.active .lesson-title');
+        if (activeLessonEl) lessonTitle = activeLessonEl.textContent.trim();
+        const activeContentEl = document.getElementById('lesson-body-content');
+        if (activeContentEl) lessonContent = activeContentEl.textContent.trim().substring(0, 500);
+      }
+
+      try {
+        const res = await api('/api/chat', 'POST', {
+          message: speechResult,
+          language: currentLanguage,
+          lessonTitle,
+          lessonContent
+        });
+
+        if (res && res.reply) {
+          if (historyEl) {
+            const aiBubble = document.createElement('div');
+            aiBubble.className = 'sf-chat-bubble ai-bubble';
+            aiBubble.textContent = res.reply;
+            historyEl.appendChild(aiBubble);
+            historyEl.scrollTop = historyEl.scrollHeight;
+          }
+
+          if (statusEl) statusEl.innerHTML = "🤖 <span>AI speaking...</span>";
+          
+          const micBtn = document.getElementById('sf-frust-mic-btn');
+          if (micBtn) micBtn.disabled = true;
+
+          // Introduce a short delay before AI speaks the answer to make sure the microphone is fully released
+          setTimeout(() => {
+            this.speakTextWithCallback(res.reply, currentLanguage, () => {
+              if (micBtn) micBtn.disabled = false;
+              if (statusEl) statusEl.innerHTML = "😊 <span>Help active</span>";
+            });
+          }, 300);
+        } else {
+          throw new Error("No response");
+        }
+      } catch (err) {
+        console.error("Assistant chat error:", err);
+        if (statusEl) statusEl.innerHTML = "⚠️ <span>Error getting answer</span>";
+      }
+    };
+
+    this.frustRecognition.onend = () => {
+      this.frustIsListening = false;
+      const waveEl = document.getElementById('sf-frust-wave');
+      if (waveEl) waveEl.classList.add('hidden');
+      const micBtn = document.getElementById('sf-frust-mic-btn');
+      if (micBtn) {
+        micBtn.innerHTML = '🎤 Tap to Talk';
+        micBtn.classList.remove('active');
+      }
+      const statusEl = document.getElementById('sf-frust-status-text');
+      if (statusEl && statusEl.textContent.includes("Listening")) {
+        statusEl.innerHTML = "😊 <span>Help active</span>";
+      }
+    };
+
+    this.frustRecognition.onerror = (event) => {
+      console.error("Frustration mic error:", event.error);
+      const statusEl = document.getElementById('sf-frust-status-text');
+      if (statusEl) {
+        if (event.error === 'not-allowed') {
+          statusEl.innerHTML = "⚠️ <span>Mic blocked</span>";
+          showToast("🎙️ Mic permission blocked. Please allow mic in settings.");
+        } else if (event.error === 'no-speech') {
+          statusEl.innerHTML = "⚠️ <span>No speech heard</span>";
+        } else {
+          statusEl.innerHTML = `⚠️ <span>Mic error: ${event.error}</span>`;
+        }
+      }
+      this.stopSpeechRecognition();
+    };
+
+    this.frustRecognition.start();
+  },
+
+  stopSpeechRecognition() {
+    if (this.frustRecognition) {
+      try {
+        this.frustRecognition.stop();
+      } catch (e) {}
+      this.frustRecognition = null;
+    }
+    this.frustIsListening = false;
+    const waveEl = document.getElementById('sf-frust-wave');
+    if (waveEl) waveEl.classList.add('hidden');
+    const micBtn = document.getElementById('sf-frust-mic-btn');
+    if (micBtn) {
+      micBtn.innerHTML = '🎤 Tap to Talk';
+      micBtn.classList.remove('active');
+    }
+  },
+
+  toggleManualInput() {
+    const inputRow = document.getElementById('sf-frust-input-row');
+    if (inputRow) {
+      inputRow.classList.toggle('hidden');
+      if (!inputRow.classList.contains('hidden')) {
+        const txtInp = document.getElementById('sf-frust-text-input');
+        if (txtInp) txtInp.focus();
+      }
+    }
+  },
+
+  handleManualInputKey(event) {
+    if (event.key === 'Enter') {
+      this.submitManualInput();
+    }
+  },
+
+  async submitManualInput() {
+    const inputEl = document.getElementById('sf-frust-text-input');
+    if (!inputEl) return;
+    const text = inputEl.value.trim();
+    if (!text) return;
+
+    inputEl.value = '';
+    const inputRow = document.getElementById('sf-frust-input-row');
+    if (inputRow) inputRow.classList.add('hidden');
+
+    this.stopSpeechRecognition();
+
+    const historyEl = document.getElementById('sf-frust-chat-history');
+    if (historyEl) {
+      const studentBubble = document.createElement('div');
+      studentBubble.className = 'sf-chat-bubble student-bubble';
+      studentBubble.textContent = text;
+      historyEl.appendChild(studentBubble);
+      historyEl.scrollTop = historyEl.scrollHeight;
+    }
+
+    const statusEl = document.getElementById('sf-frust-status-text');
+    if (statusEl) statusEl.innerHTML = "🧠 <span>Thinking...</span>";
+
+    let lessonTitle = '';
+    let lessonContent = '';
+    if (typeof currentLessonId !== 'undefined' && currentLessonId) {
+      const activeLessonEl = document.getElementById('lesson-title-display') || document.querySelector('.lesson-card.active .lesson-title');
+      if (activeLessonEl) lessonTitle = activeLessonEl.textContent.trim();
+      const activeContentEl = document.getElementById('lesson-body-content');
+      if (activeContentEl) lessonContent = activeContentEl.textContent.trim().substring(0, 500);
+    }
+
+    try {
+      const res = await api('/api/chat', 'POST', {
+        message: text,
+        language: currentLanguage,
+        lessonTitle,
+        lessonContent
+      });
+
+      if (res && res.reply) {
+        if (historyEl) {
+          const aiBubble = document.createElement('div');
+          aiBubble.className = 'sf-chat-bubble ai-bubble';
+          aiBubble.textContent = res.reply;
+          historyEl.appendChild(aiBubble);
+          historyEl.scrollTop = historyEl.scrollHeight;
+        }
+
+        if (statusEl) statusEl.innerHTML = "🤖 <span>AI speaking...</span>";
+
+        const micBtn = document.getElementById('sf-frust-mic-btn');
+        if (micBtn) micBtn.disabled = true;
+
+        this.speakTextWithCallback(res.reply, currentLanguage, () => {
+          if (micBtn) micBtn.disabled = false;
+          if (statusEl) statusEl.innerHTML = "😊 <span>Help active</span>";
+        });
+      } else {
+        throw new Error("No response");
+      }
+    } catch (err) {
+      console.error("Assistant chat error:", err);
+      if (statusEl) statusEl.innerHTML = "⚠️ <span>Error getting answer</span>";
+    }
+  },
 
   // --- Init: start camera stream ---
   async startCamera() {
@@ -3391,7 +4189,9 @@ const SmartFocus = {
     }
 
     // Engagement intervention popup (bored/distracted/frustrated/confused)
-    if (this.consecutiveLowEngagement >= this.LOW_ENGAGEMENT_THRESHOLD && !this.popupDismissed) {
+    if (emotion === 'frustrated') {
+      this.triggerFrustrationAI();
+    } else if (this.consecutiveLowEngagement >= this.LOW_ENGAGEMENT_THRESHOLD && !this.popupDismissed) {
       this.triggerIntervention(emotion);
       this.consecutiveLowEngagement = 0;
     } else if (this.consecutiveConfused >= this.CONFUSED_THRESHOLD && !this.popupDismissed) {
@@ -3485,7 +4285,7 @@ const SmartFocus = {
     this.consecutiveConfused = 0;
     this.quizDifficultyLevel = 'normal';
     this.popupDismissed = false;
-    this.lastAnalysisTime = 0; // reset so first analysis fires immediately
+    this.lastAnalysisTime = 0;
 
     // Reset local tracking values
     this.faceCenterHistory = [];
@@ -3494,6 +4294,14 @@ const SmartFocus = {
     this.turnCounter = 0;
     this.slouchCounter = 0;
     this.localStatesBuffer = [];
+
+    // Reset enhanced focus tracking
+    this.distractionEvents = 0;
+    this.longestFocusStreak = 0;
+    this.currentFocusStreak = 0;
+    this.focusXpAwarded = 0;
+    this.wasDistracted = false;
+    this.milestonesFired = new Set();
 
     document.getElementById('smart-focus-widget').classList.remove('sf-hidden');
     this.setStatus('active', 'Focus AI active 🧠');
@@ -3511,6 +4319,8 @@ const SmartFocus = {
 
   // --- Full stop ---
   stop() {
+    // Show session summary before stopping
+    this.showSessionSummary();
     this.active = false;
     this.stopLoop();
     this.stopCamera();
@@ -3521,10 +4331,16 @@ const SmartFocus = {
     this.syncFocusData();
     const overlay = document.getElementById('sf-distraction-overlay');
     if (overlay) {
-      overlay.classList.remove('active');
+      overlay.classList.remove('active', 'sf-distraction-flash');
     }
     document.getElementById('smart-focus-widget').classList.add('sf-hidden');
     document.getElementById('sf-engagement-popup').classList.add('sf-hidden');
+    const frustPopup = document.getElementById('sf-frustration-popup');
+    if (frustPopup) frustPopup.classList.add('sf-hidden');
+    this.stopSpeechRecognition();
+    if (window.speechSynthesis) {
+      window.speechSynthesis.cancel();
+    }
     document.body.classList.remove('sf-calm-pulse');
     const badge = document.getElementById('sf-emotion-badge');
     if (badge) { badge.textContent = '😊 Ready'; badge.className = 'sf-emotion-badge'; }
@@ -3540,6 +4356,12 @@ const SmartFocus = {
     this.sessionFocusSeconds = 0;
     this.sessionDistractedSeconds = 0;
     this.continuousFocusSeconds = 0;
+    this.distractionEvents = 0;
+    this.longestFocusStreak = 0;
+    this.currentFocusStreak = 0;
+    this.focusXpAwarded = 0;
+    this.wasDistracted = false;
+    this.milestonesFired = new Set();
 
     if (this.sessionTimerInterval) {
       clearInterval(this.sessionTimerInterval);
@@ -3552,38 +4374,242 @@ const SmartFocus = {
       }
     }, 1000);
 
-    const timerText = document.getElementById('sf-timer-text');
-    if (timerText) {
-      timerText.textContent = `⏱️ 00:00`;
+    // Init streak ring display
+    const timerWrap = document.getElementById('sf-timer-text');
+    if (timerWrap) {
+      timerWrap.textContent = '⏱️ 00:00';
     }
+    // Update distraction counter to 0
+    this.updateDistractionCounter();
   },
 
   onSessionTimerTick() {
     if (!this.active || !this.currentLessonId) return;
 
-    if (this.currentEmotion === 'distracted') {
+    const isDistracted = (this.currentEmotion === 'distracted' || this.currentEmotion === 'bored');
+
+    if (isDistracted) {
       this.sessionDistractedSeconds++;
       this.continuousFocusSeconds = 0;
+
+      // Distraction ONSET: was focused before, now distracted
+      if (!this.wasDistracted) {
+        this.onDistractionOnset();
+      }
+      this.wasDistracted = true;
     } else {
       this.sessionFocusSeconds++;
       this.continuousFocusSeconds++;
+      this.currentFocusStreak++;
 
+      // Track longest streak
+      if (this.currentFocusStreak > this.longestFocusStreak) {
+        this.longestFocusStreak = this.currentFocusStreak;
+      }
+
+      this.wasDistracted = false;
+
+      // Legacy 60-second XP spark
       if (this.continuousFocusSeconds >= 60) {
         this.continuousFocusSeconds = 0;
         this.awardFocusXP();
       }
+
+      // Check focus milestones (5/10/15 min)
+      this.checkFocusMilestones();
     }
 
-    const timerText = document.getElementById('sf-timer-text');
-    if (timerText) {
-      timerText.textContent = `⏱️ ${this.formatTime(this.sessionFocusSeconds)}`;
-    }
+    // Update visual streak ring
+    this.updateStreakRing();
   },
 
   formatTime(sec) {
     const mins = Math.floor(sec / 60);
     const secs = sec % 60;
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  },
+
+  // --- Web Audio beep for distraction alert ---
+  playDistractionBeep() {
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.2);
+      gain.gain.setValueAtTime(0.3, ctx.currentTime);
+      gain.gain.linearRampToValueAtTime(0, ctx.currentTime + 0.25);
+      osc.start(ctx.currentTime);
+      osc.stop(ctx.currentTime + 0.25);
+    } catch(e) { /* Audio not supported */ }
+  },
+
+  // --- Distraction event: fires once on onset ---
+  onDistractionOnset() {
+    this.distractionEvents++;
+    this.currentFocusStreak = 0;
+
+    // Flash overlay + sound
+    const overlay = document.getElementById('sf-distraction-overlay');
+    if (overlay) {
+      overlay.classList.add('active', 'sf-distraction-flash');
+      setTimeout(() => overlay.classList.remove('sf-distraction-flash'), 800);
+    }
+    this.playDistractionBeep();
+
+    // Update distraction counter badge
+    this.updateDistractionCounter();
+
+    // Show toast
+    if (typeof showToast === 'function') {
+      showToast(`👀 Stay focused! Distraction #${this.distractionEvents} recorded.`, 3500);
+    }
+  },
+
+  // --- Update distraction counter in widget ---
+  updateDistractionCounter() {
+    const el = document.getElementById('sf-distraction-count');
+    if (el) {
+      el.textContent = this.distractionEvents;
+      el.parentElement.classList.toggle('sf-distract-warn', this.distractionEvents >= 5);
+    }
+  },
+
+  // --- Focus streak ring color update ---
+  updateStreakRing() {
+    const ringEl = document.getElementById('sf-streak-ring-fill');
+    const timerEl = document.getElementById('sf-timer-text');
+    const streakSec = this.currentFocusStreak;
+    const streakMin = streakSec / 60;
+
+    let color, label;
+    if (streakMin < 2)       { color = '#6b7280'; label = `⏱️ ${this.formatTime(this.sessionFocusSeconds)}`; }
+    else if (streakMin < 5)  { color = '#f59e0b'; label = `🟡 ${this.formatTime(this.sessionFocusSeconds)}`; }
+    else if (streakMin < 10) { color = '#22c55e'; label = `🟢 ${this.formatTime(this.sessionFocusSeconds)}`; }
+    else                     { color = '#a855f7'; label = `💜 ${this.formatTime(this.sessionFocusSeconds)}`; }
+
+    if (ringEl) {
+      ringEl.style.stroke = color;
+      // Progress around ring: max visual at 15 min
+      const circumference = 2 * Math.PI * 18; // r=18
+      const progress = Math.min(streakSec / 900, 1); // 900s = 15min
+      ringEl.style.strokeDashoffset = circumference * (1 - progress);
+    }
+    if (timerEl) timerEl.textContent = label;
+  },
+
+  // --- Focus Milestone Reward ---
+  async checkFocusMilestones() {
+    const streakMin = Math.floor(this.currentFocusStreak / 60);
+    const milestones = [
+      { min: 5,  xp: 10, label: '🔥 5-Min Streak!',          badge: 'streak-5',  color: '#f59e0b' },
+      { min: 10, xp: 20, label: '⚡ 10-Min Focus Warrior!',  badge: 'streak-10', color: '#22c55e' },
+      { min: 15, xp: 30, label: '🧠 Deep Focus Champion!',   badge: 'streak-15', color: '#a855f7' },
+    ];
+
+    for (const m of milestones) {
+      if (streakMin >= m.min && !this.milestonesFired.has(m.badge)) {
+        this.milestonesFired.add(m.badge);
+        this.focusXpAwarded += m.xp;
+        gameXpTotal = (typeof gameXpTotal !== 'undefined' ? gameXpTotal : 0);
+        // Award XP
+        try {
+          const result = await api('/api/profile/xp', 'POST', { xp: m.xp });
+          if (currentUser) {
+            currentUser.xp = result.totalXP;
+            currentUser.level = Math.floor(result.totalXP / 200) + 1;
+            if (typeof updateNavStats === 'function') updateNavStats();
+          }
+        } catch(e) { console.error('[SmartFocus] milestone XP error', e); }
+
+        // Show animated milestone badge
+        this.showMilestoneBadge(m.label, m.color, m.xp);
+        break; // Only one milestone per tick
+      }
+    }
+  },
+
+  // --- Show animated milestone floating badge ---
+  showMilestoneBadge(label, color, xp) {
+    const el = document.createElement('div');
+    el.className = 'sf-milestone-badge';
+    el.style.borderColor = color;
+    el.style.color = color;
+    el.innerHTML = `<span style="font-size:1.2rem;">${label}</span><br><span style="font-size:0.85rem;font-weight:600;">+${xp} XP Focus Reward!</span>`;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 3500);
+    if (typeof showToast === 'function') showToast(`${label} +${xp} XP!`, 3000);
+  },
+
+  // --- Session end summary modal ---
+  showSessionSummary() {
+    const fMin = Math.round(this.sessionFocusSeconds / 60 * 10) / 10;
+    const dMin = Math.round(this.sessionDistractedSeconds / 60 * 10) / 10;
+    const total = this.sessionFocusSeconds + this.sessionDistractedSeconds;
+    const eff = total > 0 ? Math.round(this.sessionFocusSeconds / total * 100) : 100;
+    const bestStreakMin = Math.floor(this.longestFocusStreak / 60);
+    const bestStreakSec = this.longestFocusStreak % 60;
+    const effColor = eff >= 75 ? '#22c55e' : eff >= 50 ? '#f59e0b' : '#ef4444';
+    const effLabel = eff >= 75 ? '🟢 Great Focus!' : eff >= 50 ? '🟡 Fair Focus' : '🔴 Needs Improvement';
+
+    // Only show if there was some tracked time
+    if (total < 10) return;
+
+    const modal = document.createElement('div');
+    modal.id = 'sf-session-summary';
+    modal.className = 'sf-session-summary-overlay';
+    modal.innerHTML = `
+      <div class="sf-session-summary-box">
+        <div class="sf-summary-header">
+          <span style="font-size:1.8rem;">📊</span>
+          <div>
+            <div style="font-size:1.1rem;font-weight:800;color:var(--text);">Session Focus Report</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);">How focused were you this lesson?</div>
+          </div>
+          <span style="margin-left:auto;font-size:0.9rem;font-weight:700;color:${effColor};">${effLabel}</span>
+        </div>
+
+        <div class="sf-summary-stats">
+          <div class="sf-summary-stat">
+            <div class="sf-stat-val" style="color:#22c55e;">⏱️ ${fMin}m</div>
+            <div class="sf-stat-label">Focus Time</div>
+          </div>
+          <div class="sf-summary-stat">
+            <div class="sf-stat-val" style="color:#ef4444;">👀 ${this.distractionEvents}</div>
+            <div class="sf-stat-label">Distractions</div>
+          </div>
+          <div class="sf-summary-stat">
+            <div class="sf-stat-val" style="color:#a855f7;">🏆 ${bestStreakMin}m ${bestStreakSec}s</div>
+            <div class="sf-stat-label">Best Streak</div>
+          </div>
+          <div class="sf-summary-stat">
+            <div class="sf-stat-val" style="color:#f59e0b;">⚡ ${this.focusXpAwarded} XP</div>
+            <div class="sf-stat-label">Focus XP Earned</div>
+          </div>
+        </div>
+
+        <div class="sf-summary-bar-wrap">
+          <div class="sf-summary-bar-label">
+            <span style="color:#22c55e;">Focus ${eff}%</span>
+            <span style="color:#ef4444;">Distracted ${100-eff}%</span>
+          </div>
+          <div class="sf-summary-bar-track">
+            <div class="sf-summary-bar-focus" style="width:${eff}%;background:${effColor};"></div>
+          </div>
+        </div>
+
+        <div class="sf-summary-actions">
+          <button class="sf-summary-btn-secondary" onclick="showScreen('my-focus');document.getElementById('sf-session-summary').remove();">
+            📈 View My History
+          </button>
+          <button class="sf-summary-btn-primary" onclick="document.getElementById('sf-session-summary').remove();">
+            Close ✕
+          </button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
   },
 
   async awardFocusXP() {
@@ -3632,25 +4658,36 @@ const SmartFocus = {
     if (!this.currentLessonId) return;
     const fSec = this.sessionFocusSeconds;
     const dSec = this.sessionDistractedSeconds;
-    // If there is nothing to sync, return
     if (fSec === 0 && dSec === 0) return;
 
-    // Reset session stats for next segment/sync, so we don't double sync if called multiple times
+    // Snapshot new fields before reset
+    const dEvt    = this.distractionEvents;
+    const lStreak = this.longestFocusStreak;
+    const fXp     = this.focusXpAwarded;
+
+    // Reset session stats immediately to avoid double-sync
     this.sessionFocusSeconds = 0;
     this.sessionDistractedSeconds = 0;
+    this.distractionEvents = 0;
+    this.focusXpAwarded = 0;
 
     try {
       await api('/api/focus/sync', 'POST', {
-        lesson_id: this.currentLessonId,
-        focus_seconds: fSec,
-        distracted_seconds: dSec
+        lesson_id:            this.currentLessonId,
+        focus_seconds:        fSec,
+        distracted_seconds:   dSec,
+        distraction_events:   dEvt,
+        longest_focus_streak: lStreak,
+        focus_xp_awarded:     fXp,
       });
-      console.log(`[SmartFocus] Synced ${fSec}s focus and ${dSec}s distraction for lesson ${this.currentLessonId}`);
+      console.log(`[SmartFocus] Synced focus=${fSec}s distract=${dSec}s events=${dEvt} streak=${lStreak}s xp=${fXp}`);
     } catch (err) {
       console.error('[SmartFocus] Error syncing focus metrics:', err);
-      // Restore values on sync failure so they can be tried again next sync
-      this.sessionFocusSeconds += fSec;
+      // Restore values on sync failure
+      this.sessionFocusSeconds    += fSec;
       this.sessionDistractedSeconds += dSec;
+      this.distractionEvents      += dEvt;
+      this.focusXpAwarded         += fXp;
     }
   },
 
@@ -3822,3 +4859,565 @@ function dismissEngagementPopup() {
   SmartFocus.dismissEngagementPopup();
 }
 
+// ===== STUDY GROUPS & COLLABORATIVE CHALLENGES FRONTEND LOGIC =====
+let activeGroupId = null;
+let currentWeakestLink = null;
+let selectedWLOptionKey = null;
+
+async function loadGroups() {
+  if (!currentUser) return;
+  
+  try {
+    const res = await api('/api/groups/my-group');
+    if (res.inGroup) {
+      activeGroupId = res.group.id;
+      document.getElementById('group-non-member-view').classList.add('hidden');
+      document.getElementById('group-member-view').classList.remove('hidden');
+      
+      document.getElementById('my-group-name').textContent = res.group.name;
+      document.getElementById('my-challenge-desc').textContent = `Challenge: ${res.group.challengeName} (Target: Complete ${res.group.targetLessons} lessons by ${res.group.deadline})`;
+      document.getElementById('my-group-badge-icon').textContent = res.group.badgeIcon;
+      document.getElementById('my-group-badge-name').textContent = res.group.badgeName;
+      
+      // Update progress bar
+      document.getElementById('group-progress-text').textContent = `${res.totalProgress} / ${res.group.targetLessons} Lessons Completed`;
+      const pct = Math.min(100, (res.totalProgress / res.group.targetLessons) * 100);
+      document.getElementById('group-progress-fill').style.width = pct + '%';
+      
+      // Render members
+      renderMembersList(res.members);
+      
+      // Render leaderboard
+      renderGroupLeaderboard(res.leaderboard);
+      
+      // Render chat
+      renderChatMessages(res.messages);
+      
+      // Render weakest link
+      if (res.weakestLink) {
+        document.getElementById('weakest-link-card').classList.remove('hidden');
+        document.getElementById('weakest-link-text').textContent = `🚨 ${res.weakestLink.studentName} is struggling with "${res.weakestLink.lessonTitle}" in ${res.weakestLink.subjectName}! Help them by answering a bonus question!`;
+        currentWeakestLink = res.weakestLink;
+      } else {
+        document.getElementById('weakest-link-card').classList.add('hidden');
+        currentWeakestLink = null;
+      }
+      
+      // Init socket connection
+      initGroupSocket(res.group.id);
+    } else {
+      activeGroupId = null;
+      document.getElementById('group-member-view').classList.add('hidden');
+      document.getElementById('group-non-member-view').classList.remove('hidden');
+      
+      // Fetch active challenges
+      const challenges = await api('/api/challenges/active');
+      renderChallengesPicker(challenges);
+    }
+  } catch (err) {
+    console.error('Error loading study groups page:', err);
+    showToast('⚠️ Could not load study groups data');
+  }
+}
+
+function renderMembersList(members) {
+  const container = document.getElementById('group-members-list');
+  if (!container) return;
+  
+  if (!members || members.length === 0) {
+    container.innerHTML = '<div class="empty-state">No members in this group yet.</div>';
+    return;
+  }
+  
+  container.innerHTML = members.map(m => `
+    <div class="group-member-item">
+      <div class="gmi-left">
+        <div class="gmi-avatar">${m.avatar || '🧑‍🎓'}</div>
+        <div>
+          <div class="gmi-name">${m.name} ${m.id === currentUser.id ? ' (You)' : ''}</div>
+          <div class="gmi-meta">Level ${m.level || 1} · ${m.xp || 0} XP</div>
+        </div>
+      </div>
+      <div class="gmi-right">
+        <div class="gmi-score">${m.lessonsCompleted || 0}</div>
+        <div class="gmi-score-label">lessons completed</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderGroupLeaderboard(leaderboard) {
+  const container = document.getElementById('group-leaderboard-list');
+  if (!container) return;
+  
+  if (!leaderboard || leaderboard.length === 0) {
+    container.innerHTML = '<div class="empty-state">No leaderboard data yet.</div>';
+    return;
+  }
+  
+  container.innerHTML = leaderboard.map((g, idx) => `
+    <div class="group-member-item" style="${g.isMyGroup ? 'border-color:var(--purple); background:rgba(123, 104, 238, 0.05);' : ''}">
+      <div class="gmi-left">
+        <div style="font-weight:bold; font-size:1.1rem; color:var(--text3); width:24px;">#${idx + 1}</div>
+        <div>
+          <div class="gmi-name" style="${g.isMyGroup ? 'color:var(--purple);' : ''}">${g.name} ${g.isMyGroup ? ' (Our Group)' : ''}</div>
+        </div>
+      </div>
+      <div class="gmi-right">
+        <div class="gmi-score">${g.progress || 0}</div>
+        <div class="gmi-score-label">completed lessons</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderChallengesPicker(challenges) {
+  const container = document.getElementById('active-challenges-list');
+  if (!container) return;
+  
+  if (!challenges || challenges.length === 0) {
+    container.innerHTML = '<div class="empty-state">No active challenges. Ask your teacher to publish one!</div>';
+    return;
+  }
+  
+  container.innerHTML = challenges.map(c => {
+    const deadlineStr = new Date(c.deadline).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' });
+    
+    // Subgroups HTML
+    let subgroupsHtml = '';
+    if (c.groups && c.groups.length > 0) {
+      subgroupsHtml = `
+        <div class="cpc-subgroups">
+          <div class="cpc-subgroups-title">Existing Study Groups:</div>
+          ${c.groups.map(g => `
+            <div class="subgroup-join-row">
+              <span>👥 <strong>${g.name}</strong> (${g.member_count}/${c.team_size} members)</span>
+              ${g.member_count < c.team_size 
+                ? `<button class="btn-primary" onclick="joinStudyGroup(${g.id})">Join Group</button>` 
+                : '<span style="color:var(--text3); font-size:0.8rem;">Full / फुल</span>'}
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+    
+    return `
+      <div class="challenge-picker-card">
+        <div class="cpc-header">
+          <div>
+            <h4 class="cpc-title">${c.name}</h4>
+            <div class="cpc-meta">By ${c.creator_name} · Deadline: ${deadlineStr} · Team size: ${c.team_size} max</div>
+          </div>
+          <div class="cpc-badge-pill">${c.badge_icon} ${c.badge_name}</div>
+        </div>
+        
+        <p style="font-size:0.85rem; color:var(--text2); line-height:1.4;">Goal: Collective target of <strong>${c.target_lessons} lessons completed</strong> during the challenge window.</p>
+        
+        ${subgroupsHtml}
+        
+        <div class="cpc-actions">
+          <div style="flex:1; display:flex; gap:8px;">
+            <input type="text" id="new-group-name-${c.id}" placeholder="Create new study group..." style="flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:8px; font-size:0.85rem; outline:none;">
+            <button class="btn-primary" onclick="createStudyGroup(${c.id})" style="margin:0; padding:8px 16px; font-size:0.85rem; border-radius:8px;">Create Group</button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+async function createStudyGroup(challengeId) {
+  const input = document.getElementById(`new-group-name-${challengeId}`);
+  const name = input?.value?.trim();
+  if (!name) {
+    showToast('⚠️ Please enter a study group name');
+    return;
+  }
+  
+  try {
+    const res = await api('/api/groups/create', 'POST', { challenge_id: challengeId, name });
+    if (res.success) {
+      showToast('🎉 Study Group created successfully!');
+      loadGroups();
+    }
+  } catch (err) {
+    showToast(err.error || '❌ Could not create study group');
+  }
+}
+
+async function joinStudyGroup(groupId) {
+  try {
+    const res = await api('/api/groups/join', 'POST', { group_id: groupId });
+    if (res.success) {
+      showToast('🎉 Joined study group successfully!');
+      loadGroups();
+    }
+  } catch (err) {
+    showToast(err.error || '❌ Could not join study group');
+  }
+}
+
+async function leaveCurrentGroup() {
+  if (!activeGroupId) return;
+  if (!confirm('Are you sure you want to leave this study group? Your progress contribution will remain but you will no longer share the reward or chat.')) return;
+  
+  try {
+    const res = await api('/api/groups/leave', 'POST', { group_id: activeGroupId });
+    if (res.success) {
+      showToast('🚪 Left study group');
+      loadGroups();
+    }
+  } catch (err) {
+    showToast(err.error || '❌ Could not leave study group');
+  }
+}
+
+// Socket mini chat functions
+function initGroupSocket(groupId) {
+  if (typeof io === 'undefined') return;
+  if (!socket) {
+    socket = io({
+      auth: { token: currentToken }
+    });
+  }
+  socket.emit('joinGroupRoom', { groupId });
+  
+  // Real-time chat events
+  socket.off('groupMessage');
+  socket.on('groupMessage', (msg) => {
+    const chatContainer = document.getElementById('group-chat-messages');
+    if (chatContainer) {
+      appendChatMessage(msg);
+    }
+  });
+
+  // Real-time progress update events
+  socket.off('progressUpdated');
+  socket.on('progressUpdated', () => {
+    silentReloadGroupProgress();
+  });
+}
+
+function renderChatMessages(messages) {
+  const container = document.getElementById('group-chat-messages');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  if (!messages || messages.length === 0) {
+    container.innerHTML = '<div class="empty-state" style="color:var(--text3); font-size:0.8rem;">No messages yet. Send a note to your team!</div>';
+    return;
+  }
+  
+  messages.forEach(m => appendChatMessage(m));
+}
+
+function appendChatMessage(msg) {
+  const container = document.getElementById('group-chat-messages');
+  if (!container) return;
+
+  const empty = container.querySelector('.empty-state');
+  if (empty) empty.remove();
+
+  const isMe = msg.user_id === currentUser.id;
+  const isSystem = msg.sender_name === 'System' || (msg.message.startsWith('💡 System'));
+
+  const div = document.createElement('div');
+  if (isSystem) {
+    div.className = 'chat-message system';
+    div.innerHTML = `<div class="chat-text" style="background:transparent; border:none; padding:0; color:var(--accent); font-weight:500;">${msg.message}</div>`;
+  } else {
+    div.className = `chat-message ${isMe ? 'me' : ''}`;
+    div.innerHTML = `
+      <div class="chat-avatar">${msg.sender_avatar || '🧑‍🎓'}</div>
+      <div class="chat-bubble-wrap">
+        <div class="chat-meta">${msg.sender_name} · ${formatChatTime(msg.created_at)}</div>
+        <div class="chat-text">${escapeHtml(msg.message)}</div>
+      </div>
+    `;
+  }
+  container.appendChild(div);
+  container.scrollTop = container.scrollHeight;
+}
+
+function formatChatTime(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  } catch (e) {
+    return '';
+  }
+}
+
+function escapeHtml(str) {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+async function sendGroupChatMessage() {
+  const input = document.getElementById('group-chat-input');
+  const message = input?.value?.trim();
+  if (!message || !activeGroupId) return;
+  
+  if (socket) {
+    socket.emit('sendGroupMessage', { groupId: activeGroupId, message });
+    input.value = '';
+  } else {
+    try {
+      await api('/api/groups/chat', 'POST', { group_id: activeGroupId, message });
+      input.value = '';
+      loadGroups();
+    } catch (err) {
+      showToast('❌ Message send failed');
+    }
+  }
+}
+
+function handleGroupChatKey(event) {
+  if (event.key === 'Enter') {
+    sendGroupChatMessage();
+  }
+}
+
+async function silentReloadGroupProgress() {
+  if (!activeGroupId) return;
+  try {
+    const res = await api('/api/groups/my-group');
+    if (!res.inGroup) return;
+    
+    document.getElementById('group-progress-text').textContent = `${res.totalProgress} / ${res.group.targetLessons} Lessons Completed`;
+    const pct = Math.min(100, (res.totalProgress / res.group.targetLessons) * 100);
+    document.getElementById('group-progress-fill').style.width = pct + '%';
+    
+    renderMembersList(res.members);
+    renderGroupLeaderboard(res.leaderboard);
+    
+    if (res.weakestLink) {
+      document.getElementById('weakest-link-card').classList.remove('hidden');
+      document.getElementById('weakest-link-text').textContent = `🚨 ${res.weakestLink.studentName} is struggling with "${res.weakestLink.lessonTitle}" in ${res.weakestLink.subjectName}! Help them by answering a bonus question!`;
+      currentWeakestLink = res.weakestLink;
+    } else {
+      document.getElementById('weakest-link-card').classList.add('hidden');
+      currentWeakestLink = null;
+    }
+  } catch (err) {
+    console.error('Silent progress reload failed:', err);
+  }
+}
+
+// Teacher group challenges logic
+function openCreateChallengeModal() {
+  document.getElementById('create-challenge-modal').classList.remove('sf-hidden');
+  
+  const today = new Date();
+  const nextFriday = new Date();
+  nextFriday.setDate(today.getDate() + (5 - today.getDay() + 7) % 7 || 7);
+  document.getElementById('cc-deadline').value = nextFriday.toISOString().split('T')[0];
+  
+  document.getElementById('cc-name').value = '';
+  document.getElementById('cc-target').value = '20';
+  document.getElementById('cc-size').value = '4';
+  document.getElementById('cc-badge-name').value = '';
+  document.getElementById('create-challenge-error').classList.add('hidden');
+}
+
+function closeCreateChallengeModal() {
+  document.getElementById('create-challenge-modal').classList.add('sf-hidden');
+}
+
+async function handleCreateChallenge() {
+  const name = document.getElementById('cc-name').value.trim();
+  const target = document.getElementById('cc-target').value;
+  const size = document.getElementById('cc-size').value;
+  const deadline = document.getElementById('cc-deadline').value;
+  const badgeName = document.getElementById('cc-badge-name').value.trim();
+  const badgeIcon = document.getElementById('cc-badge-icon').value;
+  
+  const errEl = document.getElementById('create-challenge-error');
+  errEl.classList.add('hidden');
+  
+  if (!name || !target || !size || !deadline || !badgeName) {
+    errEl.textContent = 'Please fill out all fields.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  
+  try {
+    const res = await api('/api/challenges/create', 'POST', {
+      name,
+      target_lessons: parseInt(target),
+      deadline,
+      badge_name: badgeName,
+      badge_icon: badgeIcon,
+      team_size: parseInt(size)
+    });
+    
+    if (res.success) {
+      showToast('🎉 Challenge published successfully!');
+      closeCreateChallengeModal();
+      loadTeacherHome();
+    }
+  } catch (err) {
+    errEl.textContent = err.error || 'Failed to create challenge.';
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function loadTeacherChallenges() {
+  const container = document.getElementById('t-challenges-list');
+  if (!container) return;
+  
+  try {
+    const stats = await api('/api/teacher/challenges-stats');
+    if (!stats || stats.length === 0) {
+      container.innerHTML = '<div class="empty-state">No challenges published yet. Click above to start one!</div>';
+      return;
+    }
+    
+    container.innerHTML = stats.map(c => {
+      const deadlineStr = new Date(c.deadline).toLocaleDateString([], { month: 'short', day: 'numeric' });
+      
+      let groupsHtml = '<div class="empty-state" style="padding:6px; font-size:0.8rem;">No student groups formed yet.</div>';
+      if (c.groups && c.groups.length > 0) {
+        groupsHtml = c.groups.map(g => {
+          const pct = Math.min(100, Math.round((g.progress / c.target_lessons) * 100));
+          return `
+            <div style="background:var(--bg3); padding:10px; border-radius:8px; margin-bottom:8px; font-size:0.85rem; border:1px solid var(--border);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                <strong>${g.name}</strong>
+                <span style="color:var(--secondary); font-weight:bold;">${g.progress} / ${c.target_lessons} lessons (${pct}%)</span>
+              </div>
+              <div style="font-size:0.75rem; color:var(--text3); margin-bottom:6px;">Members: ${g.memberNames || 'None'}</div>
+              <div class="xp-bar-track" style="height:6px; background:var(--bg2);"><div class="xp-bar-fill" style="width:${pct}%; height:100%; background:var(--secondary);"></div></div>
+            </div>
+          `;
+        }).join('');
+      }
+      
+      return `
+        <div style="border-bottom:1px solid var(--border); padding-bottom:12px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
+            <div>
+              <strong style="font-size:0.95rem; color:var(--text);">${c.name}</strong>
+              <div style="font-size:0.75rem; color:var(--text3);">Target: ${c.target_lessons} lessons · Deadline: ${deadlineStr} · Teams of ${c.team_size}</div>
+            </div>
+            <span style="font-size:0.75rem; background:rgba(255,107,53,0.1); color:var(--primary); padding:3px 8px; border-radius:12px; font-weight:bold;">Badge: ${c.badge_icon} ${c.badge_name}</span>
+          </div>
+          <div style="margin-top:8px; padding-left:10px;">
+            ${groupsHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Error loading teacher challenges stats:', err);
+    container.innerHTML = '<div class="empty-state">Could not load challenges stats.</div>';
+  }
+}
+
+// Weakest Link Assistance Dialog
+function openWeakestLinkModal() {
+  if (!currentWeakestLink) return;
+  
+  selectedWLOptionKey = null;
+  document.getElementById('wl-result-block').classList.add('hidden');
+  document.getElementById('btn-wl-submit').classList.remove('hidden');
+  document.getElementById('btn-wl-close').classList.add('hidden');
+  
+  const q = currentWeakestLink.question;
+  document.getElementById('wl-struggling-student').textContent = currentWeakestLink.studentName;
+  document.getElementById('wl-struggling-lesson').textContent = currentWeakestLink.lessonTitle;
+  document.getElementById('wl-question-text').textContent = q.question;
+  
+  const optionsHtml = ['a', 'b', 'c', 'd'].map(opt => {
+    const text = q[`option_${opt}`];
+    if (!text) return '';
+    const key = opt.toUpperCase();
+    return `
+      <button class="quiz-option-btn" id="wl-opt-${key}" onclick="selectWLOption('${key}')" style="width:100%; text-align:left; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:12px; border-radius:10px; cursor:pointer; font-family:inherit; font-size:0.9rem; transition:all 0.2s;">
+        <strong style="color:var(--primary); margin-right:6px;">${key}.</strong> ${escapeHtml(text)}
+      </button>
+    `;
+  }).join('');
+  
+  document.getElementById('wl-options-list').innerHTML = optionsHtml;
+  document.getElementById('weakest-link-modal').classList.remove('sf-hidden');
+}
+
+function closeWeakestLinkModal() {
+  document.getElementById('weakest-link-modal').classList.add('sf-hidden');
+}
+
+function selectWLOption(key) {
+  selectedWLOptionKey = key;
+  ['A', 'B', 'C', 'D'].forEach(k => {
+    const el = document.getElementById('wl-opt-' + k);
+    if (el) {
+      el.style.borderColor = 'var(--border)';
+      el.style.background = 'var(--bg2)';
+    }
+  });
+  const activeEl = document.getElementById('wl-opt-' + key);
+  if (activeEl) {
+    activeEl.style.borderColor = 'var(--primary)';
+    activeEl.style.background = 'rgba(255, 107, 53, 0.08)';
+  }
+}
+
+async function submitWeakestLinkAnswer() {
+  if (!selectedWLOptionKey) {
+    showToast('⚠️ Please select an answer first');
+    return;
+  }
+  
+  try {
+    const res = await api('/api/groups/weakest-link/submit', 'POST', {
+      group_id: activeGroupId,
+      lesson_id: currentWeakestLink.lessonId,
+      question_id: currentWeakestLink.question.id,
+      answer: selectedWLOptionKey,
+      student_name: currentWeakestLink.studentName
+    });
+
+    const resultBlock = document.getElementById('wl-result-block');
+    const header = document.getElementById('wl-feedback-header');
+    const expText = document.getElementById('wl-explanation-text');
+    
+    resultBlock.classList.remove('hidden');
+    expText.textContent = res.explanation || 'No explanation provided.';
+
+    ['A', 'B', 'C', 'D'].forEach(k => {
+      const el = document.getElementById('wl-opt-' + k);
+      if (el) {
+        el.disabled = true;
+        if (k === res.correctAnswer) {
+          el.style.borderColor = 'var(--secondary)';
+          el.style.background = 'rgba(78, 205, 196, 0.15)';
+        } else if (k === selectedWLOptionKey) {
+          el.style.borderColor = '#FF5050';
+          el.style.background = 'rgba(255, 80, 80, 0.15)';
+        }
+      }
+    });
+
+    if (res.correct) {
+      header.textContent = '🎉 Correct Answer! +15 XP';
+      header.style.color = 'var(--secondary)';
+      showToast('🎉 Awesome! You helped your teammate and earned +15 XP!');
+      if (currentUser) {
+        currentUser.xp += 15;
+        updateNavStats();
+      }
+    } else {
+      header.textContent = '❌ Incorrect Answer';
+      header.style.color = '#FF8080';
+      showToast('❌ That was incorrect, but thank you for trying!');
+    }
+
+    document.getElementById('btn-wl-submit').classList.add('hidden');
+    document.getElementById('btn-wl-close').classList.remove('hidden');
+
+    silentReloadGroupProgress();
+  } catch(e) {
+    console.error('Error submitting assist answer:', e);
+    showToast('❌ Submission failed');
+  }
+}
