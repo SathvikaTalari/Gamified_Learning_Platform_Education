@@ -116,14 +116,14 @@
             <span class="input-icon">🏫</span>
             <input type="text" id="reg-school" placeholder="School Name / विद्यालय का नाम">
           </div>
-          <div class="input-group">
-            <span class="input-icon">🌐</span>
-            <select id="reg-language">
-              <option value="en">English</option>
-              <option value="hi">हिंदी (Hindi)</option>
-              <option value="mr">मराठी (Marathi)</option>
-              <option value="or">ଓଡ଼ିଆ (Odia)</option>
-            </select>
+          <div class="input-group" style="flex-direction: column; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 15px;">
+            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 Select exactly 3 languages:</label>
+            <div id="reg-languages" style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem;">
+              <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="en" checked> English</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="hi" checked> हिंदी (Hindi)</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="te" checked> తెలుగు (Telugu)</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="mr"> मराठी (Marathi)</label>
+            </div>
           </div>
         </div>
 
@@ -158,14 +158,14 @@
               <option value="Other">Other / अन्य</option>
             </select>
           </div>
-          <div class="input-group">
-            <span class="input-icon">🌐</span>
-            <select id="reg-teacher-language">
-              <option value="en">English</option>
-              <option value="hi">हिंदी (Hindi)</option>
-              <option value="mr">मराठी (Marathi)</option>
-              <option value="or">ଓଡ଼ିଆ (Odia)</option>
-            </select>
+          <div class="input-group" style="flex-direction: column; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 15px;">
+            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 Select exactly 3 languages:</label>
+            <div id="reg-teacher-languages" style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem;">
+              <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="en" checked> English</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="hi" checked> हिंदी (Hindi)</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="te" checked> తెలుగు (Telugu)</label>
+              <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="mr"> मराठी (Marathi)</label>
+            </div>
           </div>
         </div>
 
@@ -290,12 +290,28 @@
               <h3 class="dash-title">😴 Least Attempted Topics</h3>
               <div id="t-least-attempted" class="dash-list"></div>
             </div>
+
+            <!-- Group Challenges (Teacher) -->
+            <div class="dash-card" style="border-left: 4px solid var(--purple);">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                <h3 class="dash-title" style="margin:0;">👥 Study Group Challenges</h3>
+                <button class="btn-primary" onclick="openCreateChallengeModal()" style="padding:6px 12px; font-size:0.75rem; margin:0;">+ Create Challenge</button>
+              </div>
+              <div id="t-challenges-list" class="dash-list">
+                <div class="empty-state">Loading challenges...</div>
+              </div>
+            </div>
           </div>
           <div class="dash-col">
             <!-- At-Risk Alert -->
             <div class="dash-card at-risk-card">
               <h3 class="dash-title" style="color:#FF6B6B">🚨 At-Risk Students <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)">(no activity in 7 days)</span></h3>
               <div id="t-at-risk" class="dash-list"></div>
+            </div>
+            <!-- Focus & Gaze Analytics -->
+            <div class="dash-card">
+              <h3 class="dash-title">🧠 Student Focus & Engagement</h3>
+              <div id="t-focus-metrics" class="dash-list"></div>
             </div>
             <!-- Recent Submissions -->
             <div class="dash-card">
@@ -437,6 +453,15 @@
               </button>
             </div>
 
+            <!-- COLLABORATIVE GROUP CHALLENGES CARD -->
+            <div class="dash-card group-dash-card" style="border-left: 4px solid var(--purple); background: linear-gradient(135deg, rgba(123, 104, 238, 0.08), rgba(64, 224, 208, 0.08));">
+              <h3 class="dash-title" style="color: var(--purple);">👥 Study Groups & Challenges</h3>
+              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;">Form study groups, complete lessons together, and earn shared badges displayed on all members' profiles!</p>
+              <button class="btn-primary" onclick="showScreen('groups')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                Join Study Group 👥
+              </button>
+            </div>
+
             <div class="dash-card">
               <h3 class="dash-title">📊 Weekly XP Progress</h3>
               <div class="chart-container">
@@ -492,9 +517,44 @@
         <div id="subjects-grid" class="subjects-grid"></div>
       </div>
 
+      <!-- SUBJECT OPTIONS (LEARNING MODES) -->
+      <div id="screen-subject-options" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('subjects')">← Back / पीछे</button>
+        <div id="subject-options-header" class="lessons-header">
+          <!-- Dynamically filled header -->
+        </div>
+        <div class="subject-mode-grid">
+          <div class="mode-card" onclick="selectLearningMode('lessons')" id="mode-card-lessons">
+            <div class="mode-card-icon">📖</div>
+            <div class="mode-card-title">Video-Text Learning</div>
+            <div class="mode-card-title-hi">वीडियो-टेक्स्ट लर्निंग</div>
+            <div class="mode-card-desc">Study concepts step-by-step with translated text, speech narration, and chapter quizzes.</div>
+            <button class="btn-primary" style="margin-top:auto;">Start Learning 📚</button>
+          </div>
+          <div class="mode-card" onclick="selectLearningMode('games')" id="mode-card-games">
+            <div class="mode-card-icon">🎮</div>
+            <div class="mode-card-title">Gamified Learning</div>
+            <div class="mode-card-title-hi">गेमीफाइड लर्निंग</div>
+            <div class="mode-card-desc">Play interactive mini-games and solve puzzles matching your subject to earn bonus XP.</div>
+            <button class="btn-primary" style="margin-top:auto; background:linear-gradient(135deg, var(--secondary), #4ade80);">Play Games 🕹️</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- SUBJECT GAMES MENU -->
+      <div id="screen-subject-games" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('subject-options')">← Back / पीछे</button>
+        <div id="subject-games-header" class="lessons-header">
+          <!-- Dynamically filled header -->
+        </div>
+        <div id="subject-games-grid" class="games-grid">
+          <!-- Mapped games will be loaded here dynamically -->
+        </div>
+      </div>
+
       <!-- LESSONS LIST -->
       <div id="screen-lessons" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('subjects')">← Back</button>
+        <button class="back-btn" onclick="showScreen('subject-options')">← Back / पीछे</button>
         <div id="lessons-header" class="lessons-header"></div>
         <div id="lessons-list" class="lessons-list"></div>
       </div>
@@ -527,6 +587,42 @@
       <!-- PROFILE -->
       <div id="screen-profile" class="inner-screen">
         <div id="profile-content"></div>
+      </div>
+
+      <!-- ===== STUDENT FOCUS HISTORY SCREEN ===== -->
+      <div id="screen-my-focus" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('profile')">← Back</button>
+        <h2 class="screen-title">🧠 My Focus History</h2>
+        <p class="screen-subtitle">Track your attention across all lessons</p>
+
+        <!-- Overall Stats Row -->
+        <div id="mf-overall-stats" class="mf-stats-row">
+          <div class="mf-stat-card">
+            <div class="mf-stat-icon" style="color:#22c55e;">⏱️</div>
+            <div class="mf-stat-val" id="mf-total-focus">—</div>
+            <div class="mf-stat-label">Total Focus</div>
+          </div>
+          <div class="mf-stat-card">
+            <div class="mf-stat-icon" style="color:#ef4444;">👀</div>
+            <div class="mf-stat-val" id="mf-total-events">—</div>
+            <div class="mf-stat-label">Distractions</div>
+          </div>
+          <div class="mf-stat-card">
+            <div class="mf-stat-icon" style="color:#a855f7;">🏆</div>
+            <div class="mf-stat-val" id="mf-best-streak">—</div>
+            <div class="mf-stat-label">Best Streak</div>
+          </div>
+          <div class="mf-stat-card">
+            <div class="mf-stat-icon" style="color:#f59e0b;">⚡</div>
+            <div class="mf-stat-val" id="mf-total-xp">—</div>
+            <div class="mf-stat-label">Focus XP</div>
+          </div>
+        </div>
+
+        <!-- Per-lesson cards -->
+        <div id="mf-lessons-list" class="mf-lessons-list">
+          <div class="loading-spinner" style="text-align:center;padding:2rem;">Loading your focus data...</div>
+        </div>
       </div>
 
       <!-- QUIZ BATTLE LOBBY -->
@@ -664,6 +760,108 @@
         </div>
       </div>
 
+      <!-- COLLABORATIVE STUDY GROUPS SCREEN -->
+      <div id="screen-groups" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('home')">← Back to Home / पीछे</button>
+        
+        <!-- Not in Group view -->
+        <div id="group-non-member-view" class="hidden">
+          <h2 class="screen-title" style="font-family:'Baloo 2', cursive; font-weight:800; color:var(--purple); margin-bottom:4px; font-size:1.8rem;">👥 Study Groups & Challenges</h2>
+          <p class="screen-subtitle">Join an active group challenge or create a new team to tackle challenges together!</p>
+          
+          <div class="dashboard-grid">
+            <!-- Left Column: Challenges -->
+            <div class="dash-col">
+              <div class="dash-card">
+                <h3 class="dash-title">🏆 Active Challenges</h3>
+                <div id="active-challenges-list" class="dash-list">
+                  <div class="empty-state">No active challenges available. Ask your teacher to create one!</div>
+                </div>
+              </div>
+            </div>
+            <!-- Right Column: Create Group / Instructions -->
+            <div class="dash-col">
+              <div class="dash-card" style="border-left: 4px solid var(--purple);">
+                <h3 class="dash-title" style="color:var(--purple);">✨ How it works</h3>
+                <ul style="padding-left: 20px; font-size: 0.88rem; color: var(--text2); line-height: 1.8;">
+                  <li>Join a team or start your own for an active challenge.</li>
+                  <li>Every lesson completed by any member within the challenge timeframe builds your team's shared progress.</li>
+                  <li>Reach the lesson goal collectively before the deadline to earn a special badge!</li>
+                  <li>Help struggling teammates with <strong>Weakest Link protection</strong> to earn bonus XP.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- In Group view -->
+        <div id="group-member-view" class="hidden">
+          <div class="home-header" style="margin-bottom:20px;">
+            <div class="greeting-box">
+              <h2 id="my-group-name" class="screen-title" style="margin-bottom:4px; font-family:'Baloo 2', cursive; font-weight:800; font-size:1.8rem; color:var(--purple);">Group Name</h2>
+              <p id="my-challenge-desc" style="color:var(--text2); font-size:0.9rem;">Target: Complete 20 lessons by Friday</p>
+            </div>
+            <div class="daily-streak-box" style="border-color:var(--purple); background:rgba(123, 104, 238, 0.1);">
+              <div class="streak-fire" id="my-group-badge-icon">🛡️</div>
+              <div class="streak-count" id="my-group-badge-name" style="font-size:0.9rem; color:var(--text); font-family:'Baloo 2', cursive; font-weight:700;">Badge Name</div>
+              <div class="streak-label">Shared Reward</div>
+            </div>
+          </div>
+
+          <!-- Group Progress Section -->
+          <div class="xp-bar-section" style="margin-bottom: 24px;">
+            <div class="xp-bar-label">
+              <span>🏆 Group Progress</span>
+              <span id="group-progress-text">0 / 20 Lessons Completed</span>
+            </div>
+            <div class="xp-bar-track" style="height: 12px;"><div class="xp-bar-fill" id="group-progress-fill" style="width: 0%; background: linear-gradient(90deg, var(--purple), var(--secondary)); transition: width 0.4s ease;"></div></div>
+          </div>
+
+          <!-- Grid layout -->
+          <div class="dashboard-grid">
+            <!-- Left Col: Teammates and Leaderboard -->
+            <div class="dash-col">
+              <!-- Teammates -->
+              <div class="dash-card">
+                <h3 class="dash-title">👥 Team Members</h3>
+                <div id="group-members-list" class="dash-list"></div>
+              </div>
+
+              <!-- Leaderboard -->
+              <div class="dash-card">
+                <h3 class="dash-title">🏁 Challenge Leaderboard</h3>
+                <div id="group-leaderboard-list" class="dash-list"></div>
+              </div>
+            </div>
+
+            <!-- Right Col: Chat and Weakest Link -->
+            <div class="dash-col">
+              <!-- Weakest Link Protection Alert -->
+              <div id="weakest-link-card" class="dash-card hidden" style="border-left: 4px solid var(--primary); background: linear-gradient(135deg, rgba(255, 107, 53, 0.1), rgba(255, 230, 109, 0.05));">
+                <h3 class="dash-title" style="color: var(--primary); display:flex; align-items:center; gap:8px;">🚨 Teammate Needs Help!</h3>
+                <p id="weakest-link-text" style="font-size:0.85rem; color:var(--text2); margin-bottom:12px; line-height:1.4;">Teammate is struggling with Lesson. Solve a bonus question to support them!</p>
+                <button class="btn-primary" onclick="openWeakestLinkModal()" style="width:100%; margin-top:4px;">Solve Bonus Question 📝</button>
+              </div>
+
+              <!-- Chat Discussion Board -->
+              <div class="dash-card chat-card" style="display:flex; flex-direction:column; max-height:480px;">
+                <h3 class="dash-title">💬 Mini Chat & Tips</h3>
+                <div id="group-chat-messages" class="group-chat-history" style="flex:1; overflow-y:auto; margin:10px 0; padding:10px; background:var(--bg3); border-radius:10px; max-height: 280px; min-height: 200px; display:flex; flex-direction:column; gap:8px;"></div>
+                <div class="group-chat-input-row" style="display:flex; gap:8px;">
+                  <input type="text" id="group-chat-input" placeholder="Type notes or tips..." style="flex:1; background:var(--bg3); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;" onkeypress="handleGroupChatKey(event)">
+                  <button class="btn-primary" onclick="sendGroupChatMessage()" style="padding:10px 18px; margin:0; font-size:0.85rem; border-radius:8px;">Send</button>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div style="margin-top: 10px;">
+                <button class="btn-secondary" onclick="leaveCurrentGroup()" style="width:100%; border-color:#FF5050; color:#FF8080; background:rgba(255,80,80,0.05);">Leave Study Group 🚪</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div><!-- end screens-wrap -->
   </div><!-- end main-screen -->
 
@@ -759,6 +957,13 @@
   </div>
 </div>
 
+<!-- MINIGAME MODAL -->
+<div id="minigame-modal" class="sf-modal" style="display:none; z-index:2100;">
+  <div class="sf-modal-box" id="game-modal-content" style="max-width: 700px; width: 95%; padding: 24px; text-align: left; max-height: 90vh; overflow-y: auto;">
+    <!-- Content injected dynamically -->
+  </div>
+</div>
+
 <!-- AI TUTOR CHAT WIDGET -->
 <button id="ai-tutor-fab" class="ai-fab hidden" onclick="toggleChat()">
   🤖 <span class="ai-fab-text">Ask AI Tutor</span>
@@ -829,6 +1034,20 @@
   <div class="sf-widget-header">
     <span class="sf-status-dot" id="sf-status-dot"></span>
     <span class="sf-status-text" id="sf-status-text">Starting...</span>
+    <!-- Streak Ring + Timer -->
+    <div class="sf-streak-ring-wrap" style="margin-left:auto;margin-right:6px;display:flex;align-items:center;gap:6px;">
+      <svg width="40" height="40" viewBox="0 0 40 40" style="transform:rotate(-90deg);">
+        <circle cx="20" cy="20" r="18" fill="none" stroke="rgba(255,255,255,0.1)" stroke-width="3"/>
+        <circle id="sf-streak-ring-fill" cx="20" cy="20" r="18" fill="none" stroke="#6b7280" stroke-width="3"
+          stroke-dasharray="113.1" stroke-dashoffset="113.1" stroke-linecap="round"
+          style="transition:stroke-dashoffset 0.5s, stroke 0.5s;"/>
+      </svg>
+      <span id="sf-timer-text" style="font-family:monospace;font-size:0.78rem;font-weight:bold;color:var(--secondary);">⏱️ 00:00</span>
+    </div>
+    <!-- Distraction counter -->
+    <div class="sf-distract-badge" title="Distractions this session">
+      <span>👀</span><span id="sf-distraction-count">0</span>
+    </div>
     <button class="sf-minimize-btn" onclick="toggleSmartFocusWidget()" title="Minimise">⟨</button>
     <button class="sf-close-btn" onclick="onSmartFocusToggle(false); document.getElementById('smart-focus-toggle').checked=false;" title="Turn off">✕</button>
   </div>
@@ -852,9 +1071,143 @@
   </div>
 </div>
 
+<!-- ===== SMART FOCUS: DISTRACTION OVERLAY ===== -->
+<div id="sf-distraction-overlay" class="sf-distraction-vignette"></div>
+
+<!-- ===== SMART FOCUS: FRUSTRATION AI ASSISTANT POPUP ===== -->
+<div id="sf-frustration-popup" class="sf-frust-popup sf-hidden">
+  <div class="sf-frust-inner">
+    <button class="sf-frust-close" onclick="SmartFocus.closeFrustrationAI()">✕</button>
+    <div class="sf-frust-header">
+      <div class="sf-frust-avatar-wrap">
+        <div class="sf-frust-avatar">🤖</div>
+        <div class="sf-frust-pulse"></div>
+      </div>
+      <div class="sf-frust-header-meta">
+        <span class="sf-frust-title">VidyaQuest Voice Assistant</span>
+        <div class="sf-frust-status" id="sf-frust-status-text">Ready</div>
+      </div>
+    </div>
+    
+    <div class="sf-frust-chat-history" id="sf-frust-chat-history">
+      <div class="sf-chat-bubble ai-bubble" id="sf-frust-ai-text">
+        Loading...
+      </div>
+    </div>
+    
+    <!-- Audio Waveform Visualizer -->
+    <div class="sf-frust-wave hidden" id="sf-frust-wave">
+      <div class="sf-frust-wave-bar"></div>
+      <div class="sf-frust-wave-bar"></div>
+      <div class="sf-frust-wave-bar"></div>
+      <div class="sf-frust-wave-bar"></div>
+      <div class="sf-frust-wave-bar"></div>
+    </div>
+    
+    <div class="sf-frust-footer">
+      <button class="sf-frust-btn sf-frust-mic-btn" id="sf-frust-mic-btn" onclick="SmartFocus.startSpeechRecognition()">
+        🎤 Tap to Talk
+      </button>
+      <button class="sf-frust-btn sf-frust-type-btn" id="sf-frust-type-btn" onclick="SmartFocus.toggleManualInput()">
+        ⌨️ Type
+      </button>
+    </div>
+    
+    <div class="sf-frust-input-row hidden" id="sf-frust-input-row">
+      <input type="text" id="sf-frust-text-input" placeholder="Type your doubt here..." onkeypress="SmartFocus.handleManualInputKey(event)">
+      <button class="btn-primary" onclick="SmartFocus.submitManualInput()" style="padding:6px 12px;font-size:0.8rem;border-radius:8px;">Send</button>
+    </div>
+  </div>
+</div>
+
+<!-- TEACHER: CREATE CHALLENGE MODAL -->
+<div id="create-challenge-modal" class="sf-modal sf-hidden">
+  <div class="sf-modal-box" style="max-width: 500px; background:var(--card); border:1px solid var(--border); border-radius:24px; padding:24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+      <h3 style="font-family:'Baloo 2', cursive; font-size:1.4rem; color:var(--primary); margin:0;">🏆 Create Group Challenge</h3>
+      <button onclick="closeCreateChallengeModal()" style="background:transparent; border:none; color:var(--text3); font-size:1.3rem; cursor:pointer;">✕</button>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:12px; text-align:left;">
+      <div class="form-group">
+        <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Challenge Name *</label>
+        <input type="text" id="cc-name" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;" placeholder="e.g. Algebra Masters Sprint">
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Target Lessons *</label>
+          <input type="number" id="cc-target" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;" value="20" min="1">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Team Size *</label>
+          <input type="number" id="cc-size" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;" value="4" min="2" max="10">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Deadline Date *</label>
+        <input type="date" id="cc-deadline" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;">
+      </div>
+      <div style="display:grid; grid-template-columns:3fr 1fr; gap:10px;">
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Reward Badge Name *</label>
+          <input type="text" id="cc-badge-name" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;" placeholder="e.g. Teamwork Stars">
+        </div>
+        <div class="form-group">
+          <label class="form-label" style="font-size:0.85rem; color:var(--text2); display:block; margin-bottom:4px;">Badge Icon *</label>
+          <select id="cc-badge-icon" class="form-control" style="width:100%; background:var(--bg2); border:1px solid var(--border); color:var(--text); padding:10px; border-radius:8px; outline:none;">
+            <option value="🛡️">🛡️ Shield</option>
+            <option value="🏆">🏆 Trophy</option>
+            <option value="🔥">🔥 Fire</option>
+            <option value="🚀">🚀 Rocket</option>
+            <option value="🎓">🎓 Cap</option>
+            <option value="⭐">⭐ Star</option>
+            <option value="🧬">🧬 DNA</option>
+            <option value="🤖">🤖 Robot</option>
+          </select>
+        </div>
+      </div>
+      
+      <div id="create-challenge-error" class="error-msg hidden"></div>
+      
+      <button class="btn-primary" onclick="handleCreateChallenge()" style="margin-top:10px; width:100%;">🚀 Publish Group Challenge</button>
+    </div>
+  </div>
+</div>
+
+<!-- STUDENT: WEAKEST LINK PROTECTION QUIZ MODAL -->
+<div id="weakest-link-modal" class="sf-modal sf-hidden">
+  <div class="sf-modal-box" style="max-width: 500px; background:var(--card); border:1px solid var(--border); border-radius:24px; padding:24px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; border-bottom:1px solid var(--border); padding-bottom:10px;">
+      <h3 style="font-family:'Baloo 2', cursive; font-size:1.4rem; color:var(--primary); margin:0;">💡 Teammate Assist Quiz</h3>
+      <button onclick="closeWeakestLinkModal()" style="background:transparent; border:none; color:var(--text3); font-size:1.3rem; cursor:pointer;">✕</button>
+    </div>
+    
+    <div id="wl-quiz-content" style="text-align:left;">
+      <div style="background:rgba(255, 107, 53, 0.08); border-radius:10px; padding:12px; margin-bottom:15px; font-size:0.88rem; line-height:1.4; color:var(--text); border:1px solid rgba(255,107,53,0.2);">
+        🙋‍♂️ <strong>Helper Mode:</strong> Answering this bonus question correctly will help your teammate <span id="wl-struggling-student" style="color:var(--primary); font-weight:bold;">Student</span> build confidence on <strong id="wl-struggling-lesson">Lesson</strong> and award your team +15 XP!
+      </div>
+      
+      <div class="quiz-question-card" style="margin-bottom:15px; padding:15px; background:var(--bg3); border-radius:10px;">
+        <div class="quiz-q-text" id="wl-question-text" style="font-weight:600; font-size:1rem; line-height:1.5; color:var(--text);">Question?</div>
+      </div>
+      
+      <div class="quiz-options" id="wl-options-list" style="display:flex; flex-direction:column; gap:10px; margin-bottom:15px;">
+        <!-- Generated dynamically -->
+      </div>
+      
+      <div id="wl-result-block" class="hidden" style="margin-top:15px; padding:15px; border-radius:10px; background:var(--bg3); border:1px solid var(--border);">
+        <div id="wl-feedback-header" style="font-weight:bold; margin-bottom:8px;">Correct!</div>
+        <div id="wl-explanation-text" style="font-size:0.85rem; line-height:1.5; color:var(--text2);">Explanation</div>
+      </div>
+      
+      <button class="btn-primary" id="btn-wl-submit" onclick="submitWeakestLinkAnswer()" style="width:100%; margin-top:10px;">Submit Answer</button>
+      <button class="btn-secondary hidden" id="btn-wl-close" onclick="closeWeakestLinkModal()" style="width:100%; margin-top:10px;">Close Assist</button>
+    </div>
+  </div>
+</div>
 
 <script src="/socket.io/socket.io.js"></script>
 <script src="js/pico.js"></script>
+<script src="js/games.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
