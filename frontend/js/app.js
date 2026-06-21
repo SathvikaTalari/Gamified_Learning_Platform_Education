@@ -349,6 +349,9 @@ function showScreen(name) {
     if (typeof SmartFocus !== 'undefined') {
       SmartFocus.syncFocusData();
     }
+    if (typeof AdaptiveEngine !== 'undefined') {
+      AdaptiveEngine.syncFocusData();
+    }
   }
 
   document.querySelectorAll('.inner-screen').forEach(s => s.classList.remove('active'));
@@ -655,6 +658,15 @@ async function loadSubjectLessons() {
       const done = l.userProgress?.completed;
       const diffClass = l.difficulty;
       const title = currentLanguage==='hi' && l.title_hi ? l.title_hi : currentLanguage==='mr' && l.title_mr ? l.title_mr : currentLanguage==='te' && l.title_te ? l.title_te : l.title;
+      
+      const targetDiffHtml = l.userSubjectDiff 
+        ? `<span class="lesson-badge" style="background: var(--purple)22; color: var(--purple); border: 1px solid var(--purple)44;">🎯 Target: ${l.userSubjectDiff.toUpperCase()}</span>`
+        : '';
+        
+      const struggleHtml = l.predictStruggle
+        ? `<span class="lesson-badge predicted-struggle" style="background: rgba(255, 107, 53, 0.15); color: var(--primary); border: 1px solid rgba(255, 107, 53, 0.3);">⚠️ Review Recommended</span>`
+        : '';
+
       return `
         <div class="lesson-card ${done?'completed':''}" onclick="openLesson(${l.id})">
           <div class="lesson-card-num" style="${done?'':'color:'+color}">${done?'✓':(i+1)}</div>
@@ -662,8 +674,10 @@ async function loadSubjectLessons() {
             <div class="lesson-card-title">${title}</div>
             <div class="lesson-card-meta">
               <span class="lesson-badge ${diffClass}">${l.difficulty}</span>
+              ${targetDiffHtml}
+              ${struggleHtml}
               ${done?'<span class="lesson-badge completed">✓ Completed</span>':''}
-              ${l.userProgress?.score?`<span class="lesson-badge">Score: ${l.userProgress.score}/${l.userProgress.score*10>0?l.userProgress.score:''}</span>`:''}
+              ${l.userProgress?.score?`<span class="lesson-badge">Score: ${l.userProgress.score}</span>`:''}
             </div>
           </div>
           <div class="lesson-card-xp">+${l.xp_reward} XP</div>
@@ -748,6 +762,9 @@ async function openLesson(id) {
   if (typeof SmartFocus !== 'undefined') {
     SmartFocus.startFocusSession(id);
   }
+  if (typeof AdaptiveEngine !== 'undefined') {
+    AdaptiveEngine.startLessonSession(id);
+  }
   try {
     let lesson;
     if (navigator.onLine) {
@@ -787,50 +804,101 @@ async function openLesson(id) {
       ? `<button id="btn-download-lesson" class="btn-read-lesson" onclick="downloadLessonOffline(${id})" style="background: rgba(78, 205, 196, 0.12); color: var(--secondary); border: 1px solid rgba(78, 205, 196, 0.3); margin-right:10px;">Offline Ready ✅</button>`
       : `<button id="btn-download-lesson" class="btn-read-lesson" onclick="downloadLessonOffline(${id})" style="background: rgba(123, 104, 238, 0.12); color: var(--purple); border: 1px solid rgba(123, 104, 238, 0.3); margin-right:10px;">Download Offline 📥</button>`;
 
-    document.getElementById('lesson-content').innerHTML = `
-      <div class="lesson-header-controls" style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
-        ${downloadBtnHtml}
-        <button id="btn-read-lesson" class="btn-read-lesson" onclick="readLessonAloud()">${readBtnText}</button>
-      </div>
-      <div class="lesson-hero" style="background:${color}22;border:1px solid ${color}44;">
-        <div class="lesson-hero-subject">${lesson.subject_name}</div>
-        <div class="lesson-hero-title" style="color:${color}">${title}</div>
-        <div class="lesson-hero-meta">
-          <span class="lesson-hero-badge">Grade ${lesson.grade}</span>
-          <span class="lesson-hero-badge">${lesson.difficulty}</span>
-          <span class="lesson-hero-badge">⚡ ${lesson.xp_reward} XP</span>
-          <span class="lesson-hero-badge">${lesson.questions?.length || 0} Questions</span>
+    let struggleHtml = '';
+    if (lesson.predictStruggle) {
+      const missingStr = lesson.prereqsMissing && lesson.prereqsMissing.length ? `Prerequisites not completed: <strong>${lesson.prereqsMissing.join(', ')}</strong>` : '';
+      const weakStr = lesson.prereqsWeak && lesson.prereqsWeak.length ? `Struggled in prerequisite topics: <strong>${lesson.prereqsWeak.join(', ')}</strong>` : '';
+      const details = [missingStr, weakStr].filter(Boolean).join('. ');
+      struggleHtml = `
+        <div class="content-card struggle-warning-card" style="border-left: 4px solid var(--primary); background: rgba(255, 107, 53, 0.1); display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 12px; margin-bottom: 12px;">
+          <span style="font-size: 1.5rem;">📊</span>
+          <div>
+            <div style="font-weight: bold; color: var(--primary);">Predictive Insight: Challenging Chapter!</div>
+            <div style="font-size: 0.8rem; color: var(--text2); margin-top: 2px;">${details || 'prerequisite review suggested'}. Take it slow or try Voice-Narrator.</div>
+          </div>
         </div>
-      </div>
-      ${c.intro ? `
+      `;
+    }
+
+    let adaptiveExplanationHtml = '';
+    if (lesson.failures > 0) {
+      let styleName = 'Text Breakdown';
+      let expStyleContent = c.explanation_text || c.intro;
+      let expIcon = '📖';
+      let borderCol = 'var(--secondary)';
+      
+      if (lesson.failures === 2) {
+        styleName = 'Visual Concept Diagram';
+        expStyleContent = c.explanation_diagram || '';
+        expIcon = '🎨';
+        borderCol = 'var(--purple)';
+      } else if (lesson.failures >= 3) {
+        styleName = 'Real-Life Analogy';
+        expStyleContent = `<div class="analogy-story-box" style="padding: 12px; background: rgba(255, 230, 109, 0.05); border-radius: 8px; border-left: 3px solid var(--accent);">
+          <span style="font-size: 1.5rem; display: block; margin-bottom: 6px;">💡 Analogy Story</span>
+          <p style="font-size: 0.88rem; color: var(--text); line-height: 1.5;">${c.explanation_analogy || ''}</p>
+        </div>`;
+        expIcon = '🧩';
+        borderCol = 'var(--accent)';
+      }
+      
+      adaptiveExplanationHtml = `
+        <div class="content-card adaptive-explanation-card" style="border: 1.5px solid ${borderCol}; border-left: 5px solid ${borderCol}; background: rgba(255,255,255,0.02); padding: 16px; border-radius: 12px; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+            <h3 style="color: ${borderCol}; margin: 0; font-size: 1.05rem; display: flex; align-items: center; gap: 6px;">
+               <span>${expIcon}</span> Adaptive Help: ${styleName}
+            </h3>
+            <span style="font-size: 0.7rem; background: ${borderCol}33; color: ${borderCol}; padding: 2px 8px; border-radius: 12px; font-weight: bold;">Attempt #${lesson.failures + 1} Assist</span>
+          </div>
+          <div class="adaptive-exp-body" style="font-size: 0.9rem; color: var(--text); line-height: 1.6;" 
+               onmouseover="if('${styleName}'==='Visual Concept Diagram') AdaptiveEngine.startDiagramHover();" 
+               onmouseout="if('${styleName}'==='Visual Concept Diagram') AdaptiveEngine.endDiagramHover();">
+            ${expStyleContent}
+          </div>
+        </div>
+      `;
+    }
+
+    const introCard = c.intro ? `
       <div class="content-card">
         <h3>📖 Introduction</h3>
         <p class="intro-text">${c.intro}</p>
-      </div>` : ''}
-      ${c.concepts?.length ? `
+      </div>` : '';
+
+    const conceptsCard = c.concepts?.length ? `
       <div class="content-card">
         <h3>💡 Key Concepts</h3>
         <ul class="concept-list">
           ${c.concepts.map(concept => `<li>${concept}</li>`).join('')}
         </ul>
-      </div>` : ''}
-      ${c.example ? `
+      </div>` : '';
+
+    const exampleCard = c.example ? `
       <div class="content-card">
         <h3>🔍 Example</h3>
         <div class="example-box">
           <div class="example-label">EXAMPLE</div>
           <div class="example-text">${c.example}</div>
         </div>
-      </div>` : ''}
-      ${c.fun_fact ? `
+      </div>` : '';
+
+    const diagramCard = c.explanation_diagram ? `
+      <div class="content-card visual-diagram-card" onmouseover="AdaptiveEngine.startDiagramHover()" onmouseout="AdaptiveEngine.endDiagramHover()">
+        <h3>🎨 Visual Illustration</h3>
+        <div class="adaptive-exp-body" style="font-size: 0.9rem; color: var(--text); line-height: 1.6;">
+          ${c.explanation_diagram}
+        </div>
+      </div>` : '';
+
+    const funFactCard = c.fun_fact ? `
       <div class="content-card">
         <div class="funfact-box">
           <div class="funfact-label">⭐ FUN FACT</div>
           <div class="funfact-text">${c.fun_fact}</div>
         </div>
-      </div>` : ''}
+      </div>` : '';
 
-      <!-- Pronunciation Practice -->
+    const vocabCard = `
       <div class="content-card vocab-card">
         <h3>🗣️ English Pronunciation Practice</h3>
         <p class="vocab-subtitle">Practice saying these English STEM words. Speak clearly!</p>
@@ -852,7 +920,39 @@ async function openLesson(id) {
             `;
           }).join('')}
         </div>
+      </div>`;
+
+    let orderedCards = [];
+    const styleCode = lesson.learningStyleCode || 'reading';
+    
+    if (styleCode === 'visual') {
+      orderedCards = [diagramCard, adaptiveExplanationHtml, struggleHtml, introCard, conceptsCard, exampleCard, vocabCard, funFactCard];
+    } else if (styleCode === 'auditory') {
+      orderedCards = [vocabCard, struggleHtml, adaptiveExplanationHtml, introCard, conceptsCard, exampleCard, diagramCard, funFactCard];
+    } else {
+      orderedCards = [struggleHtml, adaptiveExplanationHtml, introCard, conceptsCard, exampleCard, diagramCard, vocabCard, funFactCard];
+    }
+
+    const lessonCardsHtml = orderedCards.filter(Boolean).join('');
+
+    document.getElementById('lesson-content').innerHTML = `
+      <div class="lesson-header-controls" style="display:flex; justify-content:flex-end; align-items:center; margin-bottom:15px;">
+        ${downloadBtnHtml}
+        <button id="btn-read-lesson" class="btn-read-lesson" onclick="readLessonAloud()">${readBtnText}</button>
       </div>
+      <div class="lesson-hero" style="background:${color}22;border:1px solid ${color}44;">
+        <div class="lesson-hero-subject">${lesson.subject_name}</div>
+        <div class="lesson-hero-title" style="color:${color}">${title}</div>
+        <div class="lesson-hero-meta">
+          <span class="lesson-hero-badge">Grade ${lesson.grade}</span>
+          <span class="lesson-hero-badge">${lesson.difficulty}</span>
+          <span class="lesson-hero-badge">⚡ ${lesson.xp_reward} XP</span>
+          <span class="lesson-hero-badge">${lesson.questions?.length || 0} Questions</span>
+          <span class="lesson-hero-badge" style="background: var(--purple); font-weight: bold;">🎯 Level: ${lesson.customDifficulty.toUpperCase()}</span>
+        </div>
+      </div>
+      
+      ${lessonCardsHtml}
 
       ${lesson.questions?.length ? `
       <button class="start-quiz-btn" onclick="startQuiz(${lesson.id})">
@@ -900,7 +1000,8 @@ async function startQuiz(lessonId) {
       score: 0, 
       answered: false, 
       xpReward: lesson.xp_reward,
-      isOffline: !navigator.onLine 
+      isOffline: !navigator.onLine,
+      questionStartTimes: {}
     };
     renderQuestion();
   } catch(e) { 
@@ -991,6 +1092,7 @@ function renderQuestion() {
       ${current+1 < questions.length ? labelNext : labelResults}
     </button>
   `;
+  quizState.questionStartTimes[current] = Date.now();
 }
 
 function selectAnswer(selected, correct, explanation) {
@@ -998,6 +1100,17 @@ function selectAnswer(selected, correct, explanation) {
   quizState.answered = true;
   const isCorrect = selected === correct;
   if (isCorrect) quizState.score++;
+  
+  const elapsed = (Date.now() - (quizState.questionStartTimes[quizState.current] || Date.now())) / 1000;
+  const q = quizState.questions[quizState.current];
+  if (q) {
+    q.timeSpent = elapsed;
+    q.isCorrect = isCorrect;
+  }
+  if (elapsed < 3.0 && isCorrect) {
+    showToast('⚡ Super Rapid Correct Answer! Under 3 seconds!');
+  }
+
   document.querySelectorAll('.quiz-option').forEach(btn => {
     btn.classList.add('disabled');
     const key = btn.dataset.key;
@@ -1060,14 +1173,33 @@ async function renderResult() {
   }
 
   try {
-    const result = await api('/api/quiz/submit','POST',{ lesson_id:lessonId, score, total });
+    const responses = quizState.questions.map(q => ({
+      question_id: q.id,
+      time_spent: q.timeSpent || 0,
+      is_correct: q.isCorrect || false
+    }));
+
+    const result = await api('/api/quiz/submit','POST',{ lesson_id:lessonId, score, total, responses });
     if (currentUser) { currentUser.xp = result.totalXP; currentUser.level = Math.floor(result.totalXP/200)+1; updateNavStats(); }
+    
+    let difficultyAlertHtml = '';
+    if (result.difficultyIncreased) {
+      difficultyAlertHtml = `
+        <div style="margin: 15px 0; background: linear-gradient(135deg, rgba(255, 107, 53, 0.15), rgba(123, 104, 238, 0.15)); border: 1.5px solid var(--primary); padding: 12px; border-radius: 12px; animation: pulseGlow 1.5s infinite alternate; text-align: center;">
+          <span style="font-size: 1.5rem;">⚡ Adaptive Engine</span>
+          <div style="font-weight: bold; color: var(--primary); margin-top: 4px;">Difficulty Increased to ${result.newDifficulty.toUpperCase()}!</div>
+          <div style="font-size: 0.8rem; color: var(--text2); margin-top: 2px;">You answered all questions rapidly and correctly. Difficulty has auto-increased with a +50 XP bonus!</div>
+        </div>
+      `;
+    }
+
     document.getElementById('quiz-container').innerHTML = `
       <div class="quiz-result">
         <div class="result-emoji">${emoji}</div>
         <div class="result-title">${title}</div>
         <div class="result-score">${score} / ${total} correct (${percentage}%)</div>
         <div class="result-xp">+${result.xpEarned} XP earned! ⚡</div>
+        ${difficultyAlertHtml}
         <div class="result-actions">
           <button class="btn-primary" onclick="goBackFromLesson()">Back to Lesson 📖</button>
           <button class="btn-secondary" onclick="startQuiz(${lessonId})">Try Again 🔄</button>
@@ -1207,6 +1339,71 @@ async function loadProfile() {
           </div>
         </div>
       </div>` : ''}
+      <!-- LEARNING DNA CARD -->
+      ${profile.role === 'student' && profile.learningDNA ? `
+      <div class="profile-section learning-dna-section" style="background: linear-gradient(135deg, rgba(123, 104, 238, 0.12), rgba(78, 205, 196, 0.12)); border: 1.5px solid rgba(123, 104, 238, 0.35); border-radius: var(--radius); padding: 20px; position: relative; overflow: hidden; box-shadow: var(--shadow); margin-bottom:12px; text-align: left;">
+        <div class="dna-helix-bg" style="position: absolute; right: 10px; top: 10px; opacity: 0.15; pointer-events: none; font-size: 4rem; animation: dnaRotate 8s linear infinite;">🧬</div>
+        <h3 style="margin-top: 0; color: white; display: flex; align-items: center; gap: 8px; font-family: 'Baloo 2', cursive; font-size: 1.25rem; color: var(--accent);">
+          🧬 Learning DNA Profile
+        </h3>
+        <p style="font-size: 0.78rem; color: var(--text2); margin-bottom: 16px;">AI-generated cognitive profile based on learning style telemetry and performance.</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <div style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.25); padding: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+            <span style="font-size: 2.2rem;">${profile.learningDNA.learningStyleCode === 'visual' ? '🎨' : profile.learningDNA.learningStyleCode === 'auditory' ? '🔊' : '📖'}</span>
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text3); font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px;">Cognitive Style</div>
+              <div style="font-size: 1.15rem; font-weight: bold; color: var(--secondary); font-family: 'Baloo 2', cursive;">${profile.learningDNA.learningStyle || 'Reading Learner'}</div>
+            </div>
+          </div>
+          
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+            <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03);">
+              <div style="font-size: 0.7rem; color: var(--text3); font-weight: bold;">⚡ OPTIMAL TIME</div>
+              <div style="font-size: 0.85rem; font-weight: 700; color: var(--accent); margin-top: 2px;">${profile.learningDNA.optimalStudyTime || 'Evening 🌙'}</div>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.03);">
+              <div style="font-size: 0.7rem; color: var(--text3); font-weight: bold;">🏆 PRIMARY STRENGTH</div>
+              <div style="font-size: 0.85rem; font-weight: 700; color: #a855f7; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${profile.learningDNA.strength || 'Determining...'}</div>
+            </div>
+          </div>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+            <div style="font-size: 0.75rem; font-weight: bold; color: var(--text2);">Cognitive Dimensions:</div>
+            
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text3); margin-bottom: 2px;">
+                <span>Visual (diagram interactions)</span>
+                <span>${Math.round(profile.learningDNA.scores.visual)}s</span>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="background: var(--secondary); height: 100%; width: ${Math.min(100, profile.learningDNA.scores.visual * 1.5)}%;"></div>
+              </div>
+            </div>
+            
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text3); margin-bottom: 2px;">
+                <span>Auditory (read-aloud triggers)</span>
+                <span>${Math.round(profile.learningDNA.scores.auditory / 5)} clicks</span>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="background: var(--purple); height: 100%; width: ${Math.min(100, profile.learningDNA.scores.auditory * 4)}%;"></div>
+              </div>
+            </div>
+            
+            <div>
+              <div style="display: flex; justify-content: space-between; font-size: 0.7rem; color: var(--text3); margin-bottom: 2px;">
+                <span>Reading (scrolling attentiveness)</span>
+                <span>${Math.round(profile.learningDNA.scores.reading)}s</span>
+              </div>
+              <div style="background: rgba(0,0,0,0.3); height: 6px; border-radius: 3px; overflow: hidden;">
+                <div style="background: var(--primary); height: 100%; width: ${Math.min(100, profile.learningDNA.scores.reading * 1.5)}%;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>` : ''}
+
       <div class="profile-section">
         <h3>📊 Stats</h3>
         <div style="color:var(--text2);font-size:0.88rem;line-height:1.8;">
@@ -1528,17 +1725,53 @@ async function showStudentFocusDetail(studentId, name, avatar) {
       : 100;
     const effColor = eff >= 75 ? '#22c55e' : eff >= 50 ? '#f59e0b' : '#ef4444';
 
+    let teacherDnaHtml = '';
+    if (learningDNA) {
+      teacherDnaHtml = `
+        <!-- LEARNING DNA CARD -->
+        <div class="profile-section learning-dna-section" style="background: linear-gradient(135deg, rgba(123, 104, 238, 0.12), rgba(78, 205, 196, 0.12)); border: 1.5px solid rgba(123, 104, 238, 0.35); border-radius: 16px; padding: 16px; position: relative; overflow: hidden; box-shadow: var(--shadow); margin-bottom:12px; text-align: left;">
+          <div class="dna-helix-bg" style="position: absolute; right: 10px; top: 10px; opacity: 0.15; pointer-events: none; font-size: 3.5rem; animation: dnaRotate 8s linear infinite;">🧬</div>
+          <h3 style="margin-top: 0; color: white; display: flex; align-items: center; gap: 8px; font-family: 'Baloo 2', cursive; font-size: 1.15rem; color: var(--accent);">
+            🧬 Student Learning DNA Profile
+          </h3>
+          
+          <div style="display: flex; flex-direction: column; gap: 12px; margin-top: 8px;">
+            <div style="display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.25); padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+              <span style="font-size: 1.8rem;">${learningDNA.learningStyleCode === 'visual' ? '🎨' : learningDNA.learningStyleCode === 'auditory' ? '🔊' : '📖'}</span>
+              <div>
+                <div style="font-size: 0.65rem; color: var(--text3); font-weight: bold; text-transform: uppercase;">Detected Style</div>
+                <div style="font-size: 1.05rem; font-weight: bold; color: var(--secondary); font-family: 'Baloo 2', cursive;">${learningDNA.learningStyle || 'Reading Learner'}</div>
+              </div>
+            </div>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <div style="font-size: 0.65rem; color: var(--text3); font-weight: bold;">⚡ OPTIMAL TIME</div>
+                <div style="font-size: 0.8rem; font-weight: 700; color: var(--accent); margin-top: 2px;">${learningDNA.optimalStudyTime || 'Evening 🌙'}</div>
+              </div>
+              <div style="background: rgba(0,0,0,0.2); padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.03);">
+                <div style="font-size: 0.65rem; color: var(--text3); font-weight: bold;">🏆 SUBJECT STRENGTH</div>
+                <div style="font-size: 0.8rem; font-weight: 700; color: #a855f7; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${learningDNA.strength || 'Determining...'}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     document.getElementById('t-detail-content').innerHTML = `
       <div style="font-family:'Baloo 2',sans-serif;">
         <div style="display:flex;align-items:center;gap:0.8rem;margin-bottom:1rem;">
           <span style="font-size:2rem;">${avatar}</span>
           <div style="flex:1">
             <div style="font-size:1.1rem;font-weight:800;color:var(--text);">${name}</div>
-            <div style="font-size:0.78rem;color:var(--text-muted);">Focus Analytics — All Sessions</div>
+            <div style="font-size:0.78rem;color:var(--text-muted);">Focus & Learning DNA Analytics</div>
           </div>
           <button onclick="document.getElementById('t-student-detail-modal').style.display='none'"
             style="background:none;border:none;color:var(--text-muted);font-size:1.2rem;cursor:pointer;">✕</button>
         </div>
+
+        ${teacherDnaHtml}
 
         <!-- Overview Stats -->
         <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0.5rem;margin-bottom:1rem;">
@@ -2003,6 +2236,9 @@ function updateSpeechUIState(speaking) {
 }
 
 function readLessonAloud() {
+  if (typeof AdaptiveEngine !== 'undefined') {
+    AdaptiveEngine.trackReadAloud();
+  }
   if (isSpeaking) {
     stopSpeaking();
     return;
@@ -2046,6 +2282,9 @@ function readLessonAloud() {
 }
 
 function readQuizQuestionAloud() {
+  if (typeof AdaptiveEngine !== 'undefined') {
+    AdaptiveEngine.trackReadAloud();
+  }
   if (isSpeaking) {
     stopSpeaking();
     return;
@@ -2186,12 +2425,23 @@ function submitBlankAnswer(correct) {
   if (quizState.answered) return;
   quizState.answered = true;
   
+  const elapsed = (Date.now() - (quizState.questionStartTimes[quizState.current] || Date.now())) / 1000;
+  const q = quizState.questions[quizState.current];
+  
   const inputEl = document.getElementById('quiz-blank-input');
   const userAns = inputEl.value.trim().toLowerCase();
   const correctAns = correct.trim().toLowerCase();
   
   const isCorrect = userAns === correctAns;
   if (isCorrect) quizState.score++;
+  
+  if (q) {
+    q.timeSpent = elapsed;
+    q.isCorrect = isCorrect;
+  }
+  if (elapsed < 3.0 && isCorrect) {
+    showToast('⚡ Super Rapid Correct Answer! Under 3 seconds!');
+  }
   
   inputEl.disabled = true;
   document.getElementById('quiz-mic-btn').disabled = true;
@@ -2206,9 +2456,7 @@ function submitBlankAnswer(correct) {
     displayOfflineHint();
   }
   
-  const { questions, current } = quizState;
-  const q = questions[current];
-  if (q.explanation) {
+  if (q && q.explanation) {
     const expEl = document.getElementById('quiz-explanation');
     document.getElementById('quiz-exp-text').textContent = q.explanation;
     expEl.style.display = 'block';
@@ -5421,3 +5669,99 @@ async function submitWeakestLinkAnswer() {
     showToast('❌ Submission failed');
   }
 }
+
+// ===== ADAPTIVE INTELLIGENCE CLIENT-SIDE ENGINE =====
+const AdaptiveEngine = {
+  activeLessonId: null,
+  lessonStartTime: null,
+  diagramHoverStart: null,
+  diagramTotalTime: 0,
+  textScrollStart: null,
+  textScrollTotalTime: 0,
+  readAloudUsed: false,
+  isDiagramHovered: false,
+
+  startLessonSession(lessonId) {
+    this.activeLessonId = lessonId;
+    this.lessonStartTime = Date.now();
+    this.diagramTotalTime = 0;
+    this.textScrollTotalTime = 0;
+    this.readAloudUsed = false;
+    this.isDiagramHovered = false;
+
+    this.textScrollStart = Date.now();
+
+    const screenEl = document.getElementById('screen-lesson');
+    if (screenEl) {
+      screenEl.onscroll = () => {
+        this.trackTextScroll();
+      };
+    }
+  },
+
+  trackTextScroll() {
+    if (this.textScrollStart) {
+      const now = Date.now();
+      const diff = (now - this.textScrollStart) / 1000;
+      if (diff > 0.5 && diff < 10) {
+        this.textScrollTotalTime += diff;
+      }
+      this.textScrollStart = now;
+    }
+  },
+
+  startDiagramHover() {
+    if (!this.isDiagramHovered) {
+      this.isDiagramHovered = true;
+      this.diagramHoverStart = Date.now();
+    }
+  },
+
+  endDiagramHover() {
+    if (this.isDiagramHovered && this.diagramHoverStart) {
+      const elapsed = (Date.now() - this.diagramHoverStart) / 1000;
+      if (elapsed > 0.1 && elapsed < 60) {
+        this.diagramTotalTime += elapsed;
+      }
+      this.diagramHoverStart = null;
+      this.isDiagramHovered = false;
+    }
+  },
+
+  trackReadAloud() {
+    this.readAloudUsed = true;
+    api('/api/adaptive/telemetry', 'POST', {
+      interaction_type: 'read_aloud',
+      duration: 5,
+      lesson_id: this.activeLessonId
+    }).catch(err => console.warn('Telemetry error:', err));
+  },
+
+  async syncFocusData() {
+    if (!this.activeLessonId) return;
+
+    this.endDiagramHover();
+    this.trackTextScroll();
+
+    const lessonDuration = (Date.now() - this.lessonStartTime) / 1000;
+
+    if (this.diagramTotalTime > 0.5) {
+      await api('/api/adaptive/telemetry', 'POST', {
+        interaction_type: 'diagram_view',
+        duration: Math.min(this.diagramTotalTime, 120),
+        lesson_id: this.activeLessonId
+      }).catch(err => console.warn('Telemetry error:', err));
+    }
+
+    const finalScrollTime = Math.min(this.textScrollTotalTime, lessonDuration);
+    if (finalScrollTime > 1.0) {
+      await api('/api/adaptive/telemetry', 'POST', {
+        interaction_type: 'text_scroll',
+        duration: Math.min(finalScrollTime, 120),
+        lesson_id: this.activeLessonId
+      }).catch(err => console.warn('Telemetry error:', err));
+    }
+
+    this.activeLessonId = null;
+  }
+};

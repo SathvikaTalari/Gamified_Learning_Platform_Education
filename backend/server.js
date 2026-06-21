@@ -243,6 +243,116 @@ db.exec(`
   );
 `);
 
+// Setup Adaptive Intelligence Engine tables
+db.exec(`
+  CREATE TABLE IF NOT EXISTS user_question_responses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    lesson_id INTEGER NOT NULL,
+    question_id INTEGER NOT NULL,
+    time_spent REAL NOT NULL,
+    is_correct INTEGER NOT NULL,
+    created_at TEXT DEFAULT (datetime('now')),
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (lesson_id) REFERENCES lessons(id),
+    FOREIGN KEY (question_id) REFERENCES questions(id)
+  );
+  CREATE TABLE IF NOT EXISTS user_adaptive_profile (
+    user_id INTEGER PRIMARY KEY,
+    visual_score REAL DEFAULT 0,
+    auditory_score REAL DEFAULT 0,
+    reading_score REAL DEFAULT 0,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+  CREATE TABLE IF NOT EXISTS user_subject_difficulty (
+    user_id INTEGER,
+    subject_code TEXT,
+    difficulty TEXT DEFAULT 'easy',
+    PRIMARY KEY (user_id, subject_code),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+
+// Migration to update seeded lesson contents with adaptive explanation styles
+try {
+  const lessons = db.prepare('SELECT id, title, content FROM lessons').all();
+  const updateStmt = db.prepare('UPDATE lessons SET content = ? WHERE id = ?');
+  
+  const ADAPTIVE_EXPLANATIONS = {
+    1: {
+      explanation_text: "Algebra uses letters (variables) like 'x' or 'y' to represent unknown numbers. An equation shows that two expressions are equal. Solving the equation means finding the value of the variable that makes the equation true.",
+      explanation_diagram: `<div class="adaptive-diagram-scale" style="display: flex; align-items: center; justify-content: center; gap: 20px; background: rgba(255, 107, 53, 0.08); padding: 15px; border-radius: 12px; border: 1.5px solid rgba(255, 107, 53, 0.25); margin: 15px 0;">
+        <div style="flex: 1; text-align: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+          <span style="display: block; font-size: 0.8rem; color: var(--text2); margin-bottom: 4px;">Left Pan</span>
+          <div style="font-size: 1.5rem; display: flex; gap: 4px; justify-content: center; align-items: center;">
+            <span style="background: var(--primary); padding: 4px 8px; border-radius: 4px; font-weight: bold; color: white;">x</span>
+            <span style="background: var(--secondary); padding: 4px 8px; border-radius: 4px; font-weight: bold; color: var(--bg);">7</span>
+          </div>
+        </div>
+        <div style="font-size: 2rem;">⚖️</div>
+        <div style="flex: 1; text-align: center; background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px;">
+          <span style="display: block; font-size: 0.8rem; color: var(--text2); margin-bottom: 4px;">Right Pan</span>
+          <div style="background: var(--accent); padding: 4px 8px; border-radius: 4px; font-weight: bold; color: var(--bg); font-size: 1.5rem; display: inline-block;">15</div>
+        </div>
+      </div>
+      <p class="diagram-caption" style="font-size: 0.82rem; color: var(--text2); text-align: center; font-style: italic;">Visualizing the equation as a balance scale. To find x, subtract 7 from both sides to keep the scale balanced!</p>`,
+      explanation_analogy: "Think of algebra like a mystery lockbox. The box is labeled 'x'. If the box and 7 gold coins are placed on one side of a balance scale, and 15 gold coins are placed on the other side, the scale balances. How many coins are hidden inside the lockbox? By taking away 7 coins from both sides, the scale remains balanced, and you see that the box 'x' must contain exactly 8 coins!"
+    },
+    6: {
+      explanation_text: "Newton's second law states that the acceleration of an object depends on two variables: the net force acting upon the object and the mass of the object. The relationship is defined by the formula: Force = mass × acceleration (F = ma).",
+      explanation_diagram: `<div class="adaptive-diagram-vectors" style="display: flex; align-items: center; justify-content: center; gap: 15px; margin: 15px 0; background: rgba(78, 205, 196, 0.08); padding: 15px; border-radius: 12px; border: 1.5px solid rgba(78, 205, 196, 0.25);">
+        <div style="background: var(--purple); color: white; padding: 12px; border-radius: 8px; font-weight: bold; box-shadow: var(--shadow);">📦 Mass (m)</div>
+        <div style="font-size: 1.3rem; color: var(--primary); font-weight: bold; animation: pulseGlow 1.5s infinite alternate;">➔ Force (F)</div>
+        <div style="font-size: 1.3rem; color: var(--secondary); font-weight: bold;">➔ Acceleration (a)</div>
+      </div>
+      <p class="diagram-caption" style="font-size: 0.82rem; color: var(--text2); text-align: center; font-style: italic;">Applying force to an object. More force causes a larger acceleration, while a heavier mass opposes acceleration.</p>`,
+      explanation_analogy: "Imagine pushing a light empty shopping cart versus a heavy shopping cart loaded with bricks. If you push both with the same strength (Force), the empty cart (low mass) will speed up (accelerate) very quickly. The heavy cart (high mass) will accelerate slowly. To make the heavy cart accelerate at the same rate, you must push it with much more force!"
+    },
+    11: {
+      explanation_text: "Coding is writing a set of instructions that a computer can execute. A variable is like a storage container for data. A loop is a way to repeat instructions multiple times, and functions allow you to group code blocks together.",
+      explanation_diagram: `<div class="adaptive-diagram-flowchart" style="display: flex; flex-direction: column; align-items: center; gap: 8px; background: rgba(123, 104, 238, 0.08); padding: 15px; border-radius: 12px; border: 1.5px solid rgba(123, 104, 238, 0.25);">
+        <div style="background: var(--purple); color: white; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">Start Loop</div>
+        <div style="color: var(--text3); font-size: 0.8rem;">▼</div>
+        <div style="background: var(--primary); color: white; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem;">Action: Print "Hello"</div>
+        <div style="color: var(--text3); font-size: 0.8rem;">▼</div>
+        <div style="background: var(--secondary); color: var(--bg); padding: 6px 12px; border-radius: 4px; font-size: 0.85rem;">Counter + 1</div>
+        <div style="color: var(--text3); font-size: 0.8rem;">▼</div>
+        <div style="background: var(--purple); color: white; padding: 6px 12px; border-radius: 4px; font-size: 0.85rem; font-weight: bold;">Loop again if Counter &lt; 5</div>
+      </div>
+      <p class="diagram-caption" style="font-size: 0.82rem; color: var(--text2); text-align: center; font-style: italic;">Flow of a simple loop repeating an action 5 times.</p>`,
+      explanation_analogy: "Think of coding like writing a recipe. A variable is like a mixing bowl where you store ingredients (data). A loop is like the instruction: 'Stir the mixture 10 times.' A function is like a pre-written sub-recipe, such as 'Make frosting,' which you can refer to anytime without writing out all the steps again."
+    }
+  };
+
+  lessons.forEach(l => {
+    let contentObj = {};
+    try { contentObj = JSON.parse(l.content || '{}'); } catch(e) {}
+    
+    const predef = ADAPTIVE_EXPLANATIONS[l.id];
+    if (predef) {
+      contentObj.explanation_text = predef.explanation_text;
+      contentObj.explanation_diagram = predef.explanation_diagram;
+      contentObj.explanation_analogy = predef.explanation_analogy;
+    } else {
+      contentObj.explanation_text = contentObj.intro || "Learn and review the core principles of this lesson. Keep practicing to master this concept!";
+      contentObj.explanation_diagram = `<div style="background: var(--bg2); padding: 15px; border-radius: 8px; text-align: center; border: 1px dashed var(--border);">
+        <span style="font-size: 2rem; display: block; margin-bottom: 8px;">💡</span>
+        <div style="font-weight: bold; margin-bottom: 6px; color: var(--accent);">Visual Concept Diagram</div>
+        <ul style="text-align: left; margin: 10px 0 0 10px; font-size: 0.85rem; color: var(--text2); line-height: 1.4;">
+          ${(contentObj.concepts || []).map(c => `<li>${c}</li>`).join('') || '<li>Standard concept review</li>'}
+        </ul>
+      </div>`;
+      contentObj.explanation_analogy = `Think of this lesson like climbing a ladder. Each step you take is a key concept that builds on the previous one. By practicing, you make your footing stronger, helping you reach the top of the subject with ease!`;
+    }
+    
+    updateStmt.run(JSON.stringify(contentObj), l.id);
+  });
+  console.log('[Adaptive Engine] Seeding adaptive explanations to lesson contents.');
+} catch(err) {
+  console.error('Error updating lessons with adaptive explanations:', err);
+}
+
+
 // Data migrations for translation
 try {
   db.prepare("UPDATE lessons SET title_te = 'బీజగణితం పరిచయం', title_or = 'ବୀଜଗଣିତର ପରିଚୟ' WHERE id = 1").run();
@@ -483,7 +593,13 @@ app.get('/api/profile', auth, (req, res) => {
   const user = db.prepare('SELECT id, name, email, role, grade, school, department, subject_specialization, language, preferred_languages, avatar, xp, level, streak, kingdom_data, escape_room_time, created_at FROM users WHERE id = ?').get(req.user.id);
   const badges = db.prepare('SELECT b.* FROM badges b JOIN user_badges ub ON b.id = ub.badge_id WHERE ub.user_id = ?').all(req.user.id);
   const progress = db.prepare('SELECT COUNT(*) as completed FROM user_progress WHERE user_id = ? AND completed = 1').get(req.user.id);
-  res.json({ ...user, badges, lessonsCompleted: progress.completed });
+  
+  let learningDNA = null;
+  if (user.role === 'student') {
+    learningDNA = getLearningDNA(req.user.id);
+  }
+  
+  res.json({ ...user, badges, lessonsCompleted: progress.completed, learningDNA });
 });
 
 // ===== MATH MINIGAMES API =====
@@ -677,7 +793,9 @@ app.get('/api/teacher/student/:id/focus', auth, requireRole('teacher'), (req, re
       FROM focus_sessions WHERE user_id = ?
     `).get(studentId);
 
-    res.json({ student, lessons, totals });
+    const learningDNA = getLearningDNA(studentId);
+
+    res.json({ student, lessons, totals, learningDNA });
   } catch (err) {
     console.error('[TeacherFocusDetail] Error:', err.message);
     res.status(500).json({ error: err.message });
@@ -743,25 +861,219 @@ app.get('/api/subjects', (req, res) => {
   res.json(db.prepare('SELECT * FROM subjects').all());
 });
 
+// ===== ADAPTIVE LEARNING HELPER =====
+function getLearningDNA(userId) {
+  db.prepare('INSERT OR IGNORE INTO user_adaptive_profile (user_id) VALUES (?)').run(userId);
+  const profile = db.prepare('SELECT visual_score, auditory_score, reading_score FROM user_adaptive_profile WHERE user_id = ?').get(userId);
+  
+  const visual = profile ? profile.visual_score : 0;
+  const auditory = profile ? profile.auditory_score : 0;
+  const reading = profile ? profile.reading_score : 0;
+  
+  let learningStyle = 'Reading Learner';
+  let learningStyleCode = 'reading';
+  const maxScore = Math.max(visual, auditory, reading);
+  if (maxScore > 0) {
+    if (maxScore === visual) { learningStyle = 'Visual Learner'; learningStyleCode = 'visual'; }
+    else if (maxScore === auditory) { learningStyle = 'Auditory Learner'; learningStyleCode = 'auditory'; }
+    else { learningStyle = 'Reading Learner'; learningStyleCode = 'reading'; }
+  }
+  
+  const strengthsRow = db.prepare(`
+    SELECT s.name as subject_name, AVG(up.score * 100.0 / (SELECT COUNT(*) FROM questions WHERE lesson_id = l.id)) as avg_pct
+    FROM user_progress up
+    JOIN lessons l ON up.lesson_id = l.id
+    JOIN subjects s ON l.subject_id = s.id
+    WHERE up.user_id = ? AND up.completed = 1
+    GROUP BY s.id
+    ORDER BY avg_pct DESC LIMIT 1
+  `).get(userId);
+  
+  const strength = strengthsRow ? `${strengthsRow.subject_name} (${Math.round(strengthsRow.avg_pct)}% Avg)` : 'Determining...';
+  
+  const hourActivity = {};
+  for (let i = 0; i < 24; i++) hourActivity[i] = 0;
+  
+  const progressTimes = db.prepare('SELECT completed_at FROM user_progress WHERE user_id = ?').all(userId);
+  progressTimes.forEach(p => {
+    if (p.completed_at) {
+      const hr = new Date(p.completed_at).getHours();
+      if (!isNaN(hr)) hourActivity[hr]++;
+    }
+  });
+  
+  const responseTimes = db.prepare('SELECT created_at FROM user_question_responses WHERE user_id = ?').all(userId);
+  responseTimes.forEach(r => {
+    if (r.created_at) {
+      const hr = new Date(r.created_at).getHours();
+      if (!isNaN(hr)) hourActivity[hr]++;
+    }
+  });
+  
+  let maxHourCount = 0;
+  let maxHour = 18;
+  for (let h = 0; h < 24; h++) {
+    if (hourActivity[h] > maxHourCount) {
+      maxHourCount = hourActivity[h];
+      maxHour = h;
+    }
+  }
+  
+  let optimalStudyTime = '';
+  if (maxHour >= 6 && maxHour < 12) {
+    optimalStudyTime = 'Morning 🌅 (6 AM - 12 PM)';
+  } else if (maxHour >= 12 && maxHour < 18) {
+    optimalStudyTime = 'Afternoon ☀️ (12 PM - 6 PM)';
+  } else if (maxHour >= 18 && maxHour < 24) {
+    optimalStudyTime = 'Evening 🌙 (6 PM - 12 AM)';
+  } else {
+    optimalStudyTime = 'Night 🌌 (12 AM - 6 AM)';
+  }
+  
+  if (maxHourCount === 0) {
+    optimalStudyTime = 'Evening 🌙 (6 PM - 9 PM)';
+  }
+  
+  const diffs = db.prepare('SELECT subject_code, difficulty FROM user_subject_difficulty WHERE user_id = ?').all(userId);
+  const subjectDifficulties = {};
+  diffs.forEach(d => {
+    subjectDifficulties[d.subject_code] = d.difficulty;
+  });
+  
+  return {
+    learningStyle,
+    learningStyleCode,
+    scores: { visual, auditory, reading },
+    strength,
+    optimalStudyTime,
+    subjectDifficulties
+  };
+}
+
+// ===== TELEMETRY API =====
+app.post('/api/adaptive/telemetry', auth, (req, res) => {
+  const { interaction_type, duration, lesson_id } = req.body;
+  if (!interaction_type) return res.status(400).json({ error: 'interaction_type is required' });
+  
+  const dVal = parseFloat(duration) || 0;
+  
+  try {
+    db.prepare('INSERT OR IGNORE INTO user_adaptive_profile (user_id) VALUES (?)').run(req.user.id);
+    
+    if (interaction_type === 'diagram_view') {
+      db.prepare('UPDATE user_adaptive_profile SET visual_score = visual_score + ? WHERE user_id = ?').run(dVal, req.user.id);
+    } else if (interaction_type === 'read_aloud') {
+      db.prepare('UPDATE user_adaptive_profile SET auditory_score = auditory_score + 5.0 WHERE user_id = ?').run(req.user.id);
+    } else if (interaction_type === 'text_scroll') {
+      db.prepare('UPDATE user_adaptive_profile SET reading_score = reading_score + ? WHERE user_id = ?').run(dVal, req.user.id);
+    }
+    
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Error updating telemetry:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ===== LESSONS =====
 app.get('/api/lessons/:subjectId', auth, (req, res) => {
   const lessons = db.prepare('SELECT * FROM lessons WHERE subject_id = ? ORDER BY order_num').all(req.params.subjectId);
   const progressMap = {};
-  db.prepare('SELECT lesson_id, completed, score FROM user_progress WHERE user_id = ?').all(req.user.id).forEach(p => { progressMap[p.lesson_id] = p; });
-  res.json(lessons.map(l => ({ ...l, userProgress: progressMap[l.id] || null })));
+  db.prepare('SELECT lesson_id, completed, score, attempts FROM user_progress WHERE user_id = ?').all(req.user.id).forEach(p => { progressMap[p.lesson_id] = p; });
+  
+  const PREREQUISITES = {
+    2: [1], 5: [4], 8: [6], 13: [12], 14: [11], 17: [15, 16]
+  };
+
+  const subject = db.prepare('SELECT code FROM subjects WHERE id = ?').get(req.params.subjectId);
+  const subCode = subject ? subject.code : '';
+  const diffRow = db.prepare('SELECT difficulty FROM user_subject_difficulty WHERE user_id = ? AND subject_code = ?').get(req.user.id, subCode);
+  const userSubjectDiff = diffRow ? diffRow.difficulty : 'easy';
+
+  res.json(lessons.map(l => {
+    const userProgress = progressMap[l.id] || null;
+    
+    let predictStruggle = false;
+    if (PREREQUISITES[l.id] && (!userProgress || userProgress.completed === 0)) {
+      PREREQUISITES[l.id].forEach(prereqId => {
+        const prereqProg = progressMap[prereqId];
+        if (!prereqProg || prereqProg.completed === 0) {
+          predictStruggle = true;
+        } else {
+          if (prereqProg.score < 8 || prereqProg.attempts >= 3) {
+            predictStruggle = true;
+          }
+        }
+      });
+    }
+
+    return {
+      ...l,
+      userProgress,
+      predictStruggle,
+      userSubjectDiff
+    };
+  }));
 });
 
 app.get('/api/lesson/:id', auth, (req, res) => {
-  const lesson = db.prepare('SELECT l.*, s.name as subject_name, s.color as subject_color FROM lessons l JOIN subjects s ON l.subject_id = s.id WHERE l.id = ?').get(req.params.id);
+  const lesson = db.prepare('SELECT l.*, s.name as subject_name, s.color as subject_color, s.code as subject_code FROM lessons l JOIN subjects s ON l.subject_id = s.id WHERE l.id = ?').get(req.params.id);
   if (!lesson) return res.status(404).json({ error: 'Not found' });
   const questions = db.prepare('SELECT * FROM questions WHERE lesson_id = ?').all(req.params.id);
   const userProgress = db.prepare('SELECT * FROM user_progress WHERE user_id = ? AND lesson_id = ?').get(req.user.id, req.params.id);
-  res.json({ ...lesson, content: JSON.parse(lesson.content||'{}'), questions, userProgress });
+  
+  const diffRow = db.prepare('SELECT difficulty FROM user_subject_difficulty WHERE user_id = ? AND subject_code = ?').get(req.user.id, lesson.subject_code);
+  const customDifficulty = diffRow ? diffRow.difficulty : 'easy';
+  
+  const failures = userProgress && userProgress.completed === 0 ? userProgress.attempts : 0;
+  
+  const PREREQUISITES = {
+    2: [1], 5: [4], 8: [6], 13: [12], 14: [11], 17: [15, 16]
+  };
+  
+  let predictStruggle = false;
+  let prereqsMissing = [];
+  let prereqsWeak = [];
+  
+  if (PREREQUISITES[lesson.id]) {
+    PREREQUISITES[lesson.id].forEach(prereqId => {
+      const prereqProg = db.prepare('SELECT score, completed, attempts FROM user_progress WHERE user_id = ? AND lesson_id = ?').get(req.user.id, prereqId);
+      const prereqLesson = db.prepare('SELECT title FROM lessons WHERE id = ?').get(prereqId);
+      const prereqName = prereqLesson ? prereqLesson.title : 'Prerequisite';
+      
+      if (!prereqProg || prereqProg.completed === 0) {
+        predictStruggle = true;
+        prereqsMissing.push(prereqName);
+      } else {
+        const qCount = db.prepare('SELECT COUNT(*) as c FROM questions WHERE lesson_id = ?').get(prereqId).c;
+        const scorePct = qCount > 0 ? (prereqProg.score * 100 / qCount) : 100;
+        if (scorePct < 75 || prereqProg.attempts >= 3) {
+          predictStruggle = true;
+          prereqsWeak.push(prereqName);
+        }
+      }
+    });
+  }
+
+  const learningDNA = getLearningDNA(req.user.id);
+  
+  res.json({
+    ...lesson,
+    content: JSON.parse(lesson.content||'{}'),
+    questions,
+    userProgress,
+    customDifficulty,
+    failures,
+    predictStruggle,
+    prereqsMissing,
+    prereqsWeak,
+    learningStyleCode: learningDNA.learningStyleCode
+  });
 });
 
 // ===== QUIZ =====
 app.post('/api/quiz/submit', auth, (req, res) => {
-  const { lesson_id, score, total } = req.body;
+  const { lesson_id, score, total, responses } = req.body;
   const lesson = db.prepare('SELECT * FROM lessons WHERE id = ?').get(lesson_id);
   if (!lesson) return res.status(404).json({ error: 'Lesson not found' });
   
@@ -775,22 +1087,63 @@ app.post('/api/quiz/submit', auth, (req, res) => {
   } else {
     db.prepare("INSERT INTO user_progress (user_id, lesson_id, score, completed, attempts, completed_at) VALUES (?, ?, ?, ?, 1, datetime('now'))").run(req.user.id, lesson_id, score, percentage>=70?1:0);
   }
+
+  // Record question-level telemetry
+  if (responses && Array.isArray(responses)) {
+    const insertResp = db.prepare('INSERT INTO user_question_responses (user_id, lesson_id, question_id, time_spent, is_correct) VALUES (?, ?, ?, ?, ?)');
+    responses.forEach(r => {
+      insertResp.run(req.user.id, lesson_id, r.question_id, r.time_spent, r.is_correct ? 1 : 0);
+    });
+  }
+
+  // Check for rapid correct answers (consistently under 3 seconds) to trigger difficulty auto-increase
+  let difficultyIncreased = false;
+  let newDifficulty = null;
+  if (responses && Array.isArray(responses) && responses.length > 0) {
+    const allRapidAndCorrect = responses.every(r => r.time_spent < 3.0 && r.is_correct);
+    if (allRapidAndCorrect) {
+      const subject = db.prepare('SELECT s.code FROM lessons l JOIN subjects s ON l.subject_id = s.id WHERE l.id = ?').get(lesson_id);
+      if (subject) {
+        const subCode = subject.code;
+        db.prepare('INSERT OR IGNORE INTO user_subject_difficulty (user_id, subject_code, difficulty) VALUES (?, ?, ?)')
+          .run(req.user.id, subCode, 'easy');
+        const currentDiffRow = db.prepare('SELECT difficulty FROM user_subject_difficulty WHERE user_id = ? AND subject_code = ?').get(req.user.id, subCode);
+        const currentDiff = currentDiffRow ? currentDiffRow.difficulty : 'easy';
+        
+        if (currentDiff === 'easy') {
+          newDifficulty = 'medium';
+          difficultyIncreased = true;
+        } else if (currentDiff === 'medium') {
+          newDifficulty = 'hard';
+          difficultyIncreased = true;
+        }
+        
+        if (difficultyIncreased) {
+          db.prepare('UPDATE user_subject_difficulty SET difficulty = ? WHERE user_id = ? AND subject_code = ?')
+            .run(newDifficulty, req.user.id, subCode);
+        }
+      }
+    }
+  }
   
   // Check if assigned and complete it
   db.prepare("UPDATE assignments SET completed = 1 WHERE user_id = ? AND lesson_id = ?").run(req.user.id, lesson_id);
 
   // Update total XP
-  db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpEarned, req.user.id);
+  const xpBonus = difficultyIncreased ? 50 : 0;
+  const totalXPEarned = xpEarned + xpBonus;
+
+  db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(totalXPEarned, req.user.id);
   db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(req.user.id);
-  db.prepare('UPDATE leaderboard SET total_xp = total_xp + ?, lessons_completed = lessons_completed + 1 WHERE user_id = ?').run(xpEarned, req.user.id);
+  db.prepare('UPDATE leaderboard SET total_xp = total_xp + ?, lessons_completed = lessons_completed + 1 WHERE user_id = ?').run(totalXPEarned, req.user.id);
   
   // Update Daily XP
   const dateStr = new Date().toISOString().split('T')[0];
   const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(req.user.id, dateStr);
   if (existingDaily) {
-      db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpEarned, existingDaily.id);
+      db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(totalXPEarned, existingDaily.id);
   } else {
-      db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(req.user.id, dateStr, xpEarned);
+      db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(req.user.id, dateStr, totalXPEarned);
   }
 
   // Badges
@@ -817,7 +1170,7 @@ app.post('/api/quiz/submit', auth, (req, res) => {
     console.error('Error emitting group progress update:', err);
   }
 
-  res.json({ xpEarned, percentage, newBadges, totalXP: user.xp });
+  res.json({ xpEarned: totalXPEarned, percentage, newBadges, totalXP: user.xp, difficultyIncreased, newDifficulty });
 });
 
 // ===== LEADERBOARD =====

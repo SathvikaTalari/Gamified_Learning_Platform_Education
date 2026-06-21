@@ -2793,3 +2793,88 @@ body.sf-calm-pulse::after {
   margin-top: 6px;
 }
 
+/* ===== ADAPTIVE ENGINE STYLING ===== */
+
+/* 1. Learning DNA Profile Card & Glassmorphic Effect */
+.learning-dna-section {
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.learning-dna-section:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(123, 104, 238, 0.25);
+}
+
+/* 2. Rotating DNA Helix Animation */
+@keyframes dnaRotate {
+  0% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(180deg) scale(1.1);
+  }
+  100% {
+    transform: rotate(360deg) scale(1);
+  }
+}
+
+.dna-helix-bg {
+  animation: dnaRotate 10s linear infinite;
+  text-shadow: 0 0 12px rgba(123, 104, 238, 0.6);
+}
+
+/* 3. Struggle Prediction Warning Pulse */
+.struggle-warning-card {
+  border-left-color: var(--primary) !important;
+  animation: borderAlertPulse 2s infinite alternate;
+}
+
+@keyframes borderAlertPulse {
+  0% {
+    border-left-color: var(--primary);
+    box-shadow: 0 0 5px rgba(255, 107, 53, 0.15);
+  }
+  100% {
+    border-left-color: #ff3c00;
+    box-shadow: 0 0 15px rgba(255, 107, 53, 0.35);
+  }
+}
+
+/* 4. Adaptive Explanation Glow */
+.adaptive-explanation-card {
+  transition: all 0.3s ease;
+  animation: pulseCardGlow 2.5s infinite alternate;
+}
+
+@keyframes pulseCardGlow {
+  0% {
+    box-shadow: 0 0 5px rgba(78, 205, 196, 0.1);
+  }
+  100% {
+    box-shadow: 0 0 18px rgba(78, 205, 196, 0.3);
+  }
+}
+
+/* 5. Custom diagrams inside explanation boxes */
+.scale-pan-divider {
+  font-size: 1.8rem;
+  animation: scaleTilt 3s ease-in-out infinite alternate;
+}
+
+@keyframes scaleTilt {
+  0% { transform: rotate(-5deg); }
+  100% { transform: rotate(5deg); }
+}
+
+.diagram-caption {
+  font-size: 0.8rem;
+  color: var(--text2);
+  text-align: center;
+  font-style: italic;
+  line-height: 1.4;
+}
+
