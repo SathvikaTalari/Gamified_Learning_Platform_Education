@@ -122,17 +122,52 @@ const T = {
 
 function t(key) { return (T[currentLanguage] || T.en)[key] || T.en[key] || key; }
 
-// ===== API CALLS =====
-async function api(endpoint, method='GET', body=null) {
+// ===== API CALLS — with timeout + retry for low-bandwidth connections =====
+let _retryToastEl = null;
+function showRetryToast(msg) {
+  if (!_retryToastEl) {
+    _retryToastEl = document.createElement('div');
+    _retryToastEl.className = 'api-retry-toast';
+    document.body.appendChild(_retryToastEl);
+  }
+  _retryToastEl.textContent = msg;
+  _retryToastEl.classList.add('show');
+  clearTimeout(_retryToastEl._hideTimer);
+  _retryToastEl._hideTimer = setTimeout(() => _retryToastEl.classList.remove('show'), 3000);
+}
+
+async function api(endpoint, method='GET', body=null, { retries=2, timeout=8000 }={}) {
   const opts = { method, headers: {'Content-Type':'application/json'} };
   if (currentToken) opts.headers['Authorization'] = 'Bearer ' + currentToken;
   if (body) opts.body = JSON.stringify(body);
-  try {
-    const res = await fetch(API + endpoint, opts);
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Request failed');
-    return data;
-  } catch(e) { throw e; }
+
+  let lastErr;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController();
+    const timerId = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(API + endpoint, { ...opts, signal: controller.signal });
+      clearTimeout(timerId);
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Request failed');
+      return data;
+    } catch(e) {
+      clearTimeout(timerId);
+      lastErr = e;
+      if (e.name === 'AbortError') {
+        // Timeout — show retry toast and wait before next attempt
+        if (attempt < retries) {
+          const wait = 1000 * (attempt + 1);
+          showRetryToast(`⏳ Slow connection… retrying (${attempt + 1}/${retries})`);
+          await new Promise(r => setTimeout(r, wait));
+        }
+      } else {
+        // Non-network error (e.g., server 4xx/5xx) — don't retry
+        throw e;
+      }
+    }
+  }
+  throw lastErr;
 }
 
 // ===== PASSWORD STRENGTH =====
@@ -351,11 +386,83 @@ function showAuthError(msg) {
   setTimeout(() => el.classList.add('hidden'), 5000);
 }
 
+// ===== CONNECTIVITY BANNER HELPERS =====
+function setConnectivityBanner(state, msg, syncStatus='') {
+  const banner  = document.getElementById('connectivity-banner');
+  const icon    = document.getElementById('connectivity-icon');
+  const msgEl   = document.getElementById('connectivity-msg');
+  const syncEl  = document.getElementById('connectivity-sync-status');
+  if (!banner) return;
+
+  // Remove all state classes
+  banner.classList.remove('connectivity-hidden', 'connectivity-offline', 'connectivity-online', 'connectivity-slow');
+
+  if (state === 'hidden') {
+    banner.classList.add('connectivity-hidden');
+    document.body.classList.remove('has-connectivity-banner');
+  } else {
+    banner.classList.add('connectivity-' + state);
+    document.body.classList.add('has-connectivity-banner');
+    if (icon)  icon.textContent  = state === 'offline' ? '📵' : state === 'slow' ? '🐢' : '✅';
+    if (msgEl) msgEl.textContent = msg;
+    if (syncEl) syncEl.textContent = syncStatus;
+  }
+}
+
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', async () => {
+  // Pre-warm IndexedDB so it's ready before the user goes offline
+  initOfflineDB().catch(err => console.warn('[VidyaQuest] IndexedDB init failed:', err));
+
   // Sync toggle button icons with the current theme state
   updateThemeButtons(document.documentElement.classList.contains('light-theme'));
 
+  // ── CONNECTIVITY EVENTS ──────────────────────────────────────────
+  // Show initial state if already offline at load time
+  if (!navigator.onLine) {
+    setConnectivityBanner('offline', '📵 No internet connection — offline lessons only / इंटरनेट नहीं है');
+  }
+
+  window.addEventListener('offline', () => {
+    setConnectivityBanner('offline', '📵 You are offline — downloaded lessons still work / ऑफ़लाइन हैं');
+  });
+
+  window.addEventListener('online', () => {
+    setConnectivityBanner('online', '✅ Back online! Syncing your progress…', '🔄 syncing…');
+    // Sync any queued offline progress to server
+    syncOfflineProgress().then(() => {
+      setConnectivityBanner('online', '✅ All synced! You are back online.', '✔ done');
+      // Hide the banner after 4 seconds once online
+      setTimeout(() => setConnectivityBanner('hidden'), 4000);
+    }).catch(() => {
+      setConnectivityBanner('online', '✅ Back online.', '');
+      setTimeout(() => setConnectivityBanner('hidden'), 3000);
+    });
+
+    // Register Background Sync if supported (will sync even if the tab closes)
+    if ('serviceWorker' in navigator && 'SyncManager' in window) {
+      navigator.serviceWorker.ready
+        .then(reg => reg.sync.register('sync-offline-progress'))
+        .catch(err => console.warn('[VidyaQuest] Background sync registration failed:', err));
+    }
+  });
+
+  // Detect very slow connections and warn the user
+  if ('connection' in navigator) {
+    const conn = navigator.connection;
+    const slowTypes = ['slow-2g', '2g'];
+    const checkSpeed = () => {
+      if (slowTypes.includes(conn.effectiveType)) {
+        setConnectivityBanner('slow', '🐢 Slow connection detected — download lessons for offline use / धीमा इंटरनेट');
+      } else if (navigator.onLine && document.body.classList.contains('has-connectivity-banner')) {
+        setConnectivityBanner('hidden');
+      }
+    };
+    conn.addEventListener('change', checkSpeed);
+    checkSpeed(); // Check immediately
+  }
+
+  // ── AUTO-LOGIN ────────────────────────────────────────────────────
   const token = localStorage.getItem('vq_token');
   if (token) {
     currentToken = token;
@@ -394,7 +501,15 @@ window.addEventListener('DOMContentLoaded', async () => {
       if (currentLanguage && currentLanguage !== 'en' && typeof TranslationEngine !== 'undefined') {
         setTimeout(() => TranslationEngine.translatePage(currentLanguage), 800);
       }
-    } catch { localStorage.removeItem('vq_token'); currentToken = null; }
+    } catch {
+      // If offline, still allow entry with cached token
+      if (!navigator.onLine) {
+        console.warn('[VidyaQuest] Offline — skipping profile fetch, using last known state');
+      } else {
+        localStorage.removeItem('vq_token');
+        currentToken = null;
+      }
+    }
   }
 });
 
@@ -3370,6 +3485,11 @@ function initSocket() {
 }
 
 function createBattleRoom() {
+  if (!navigator.onLine) {
+    showToast('⚠️ Battle requires internet / युद्ध के लिए इंटरनेट चाहिए');
+    setConnectivityBanner('offline', '📵 Quiz Battle needs a live connection. Download lessons for offline practice instead.');
+    return;
+  }
   initSocket();
   const subjectCode = document.getElementById('battle-subject').value;
   socket.emit('createRoom', { subjectCode });
@@ -3377,6 +3497,10 @@ function createBattleRoom() {
 }
 
 function joinBattleRoom() {
+  if (!navigator.onLine) {
+    showToast('⚠️ Battle requires internet / युद्ध के लिए इंटरनेट चाहिए');
+    return;
+  }
   initSocket();
   const roomCode = document.getElementById('battle-room-code').value.trim();
   if (roomCode.length !== 6 || isNaN(roomCode)) {

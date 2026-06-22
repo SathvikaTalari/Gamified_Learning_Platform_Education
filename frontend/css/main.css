@@ -6546,4 +6546,134 @@ body.sf-calm-pulse::after {
   font-weight: 700;
   color: var(--purple);
   animation: fadeIn 0.3s ease;
-}
+}
+
+/* ===== CONNECTIVITY BANNER ===== */
+.connectivity-banner {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  font-family: 'Hind', 'Segoe UI', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transform: translateY(0);
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.4s ease;
+}
+
+.connectivity-banner.connectivity-hidden {
+  transform: translateY(-100%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.connectivity-banner.connectivity-offline {
+  background: linear-gradient(135deg, #1a0a0a, #2d0f0f);
+  border-bottom: 2px solid rgba(255, 80, 80, 0.5);
+  color: #ff9f9f;
+  box-shadow: 0 4px 20px rgba(255, 50, 50, 0.25);
+}
+
+.connectivity-banner.connectivity-online {
+  background: linear-gradient(135deg, #051f1a, #0a2e27);
+  border-bottom: 2px solid rgba(0, 245, 212, 0.5);
+  color: #7fffd4;
+  box-shadow: 0 4px 20px rgba(0, 245, 212, 0.2);
+}
+
+.connectivity-banner.connectivity-slow {
+  background: linear-gradient(135deg, #1a1500, #2d2200);
+  border-bottom: 2px solid rgba(255, 210, 50, 0.5);
+  color: #ffe566;
+  box-shadow: 0 4px 20px rgba(255, 200, 50, 0.2);
+}
+
+#connectivity-sync-status {
+  margin-left: auto;
+  font-size: 0.78rem;
+  opacity: 0.8;
+  white-space: nowrap;
+}
+
+/* Push the main app down when the banner is visible */
+body.has-connectivity-banner #app {
+  padding-top: 42px;
+}
+
+/* ===== OFFLINE QUIZ HINT ===== */
+.quiz-offline-hint {
+  background: linear-gradient(135deg, rgba(123, 104, 238, 0.12), rgba(0, 245, 212, 0.08));
+  border: 1px solid rgba(123, 104, 238, 0.35);
+  border-radius: 12px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: var(--text2);
+  line-height: 1.5;
+  margin-top: 12px;
+  animation: fadeIn 0.4s ease;
+}
+
+.quiz-offline-hint::before {
+  content: '🤖 AI Hint: ';
+  font-weight: 700;
+  color: var(--purple);
+}
+
+/* ===== RETRY / LOADING OVERLAY ===== */
+.api-retry-toast {
+  position: fixed;
+  bottom: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(30, 40, 65, 0.96);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 10px 20px;
+  font-size: 0.82rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 9000;
+  opacity: 0;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+}
+
+.api-retry-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Offline-mode indicator dot in nav */
+.offline-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #ff4444;
+  border-radius: 50%;
+  margin-left: 6px;
+  animation: pulseDot 1.5s infinite;
+  vertical-align: middle;
+}
+
+@keyframes pulseDot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.5; transform: scale(0.7); }
+}
+
+/* ===== FONT FALLBACK: ensure readability even without Google Fonts ===== */
+body, .auth-container, .dash-card, .lesson-card, .content-card {
+  font-family: 'Hind', 'Segoe UI', 'Noto Sans', Arial, sans-serif;
+}
+.logo-text, .nav-logo, h1, h2, h3, .btn-primary, .mode-card-title, .lesson-card-title {
+  font-family: 'Baloo 2', 'Segoe UI Semibold', 'Arial Black', Arial, sans-serif;
+}
+

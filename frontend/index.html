@@ -3,17 +3,28 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#FF6B35">
+<meta name="description" content="VidyaQuest — Gamified STEM education for rural students. Works offline.">
 <title>VidyaQuest — STEM for Rural India</title>
+<link rel="manifest" href="/manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap"></noscript>
 <link rel="stylesheet" href="css/main.css">
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" defer></script>
 </head>
 <body>
+<!-- CONNECTIVITY STATUS BANNER -->
+<div id="connectivity-banner" class="connectivity-banner connectivity-hidden" role="alert" aria-live="polite">
+  <span id="connectivity-icon">📶</span>
+  <span id="connectivity-msg">You are offline. Some features need internet.</span>
+  <span id="connectivity-sync-status"></span>
+</div>
 <div id="app">
   <!-- AUTH SCREEN -->
   <div id="auth-screen" class="screen active">
@@ -1212,5 +1223,40 @@
 <script src="js/games.js"></script>
 <script src="js/translations.js"></script>
 <script src="js/app.js"></script>
+
+<!-- SERVICE WORKER REGISTRATION -->
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js')
+        .then((reg) => {
+          console.log('[VidyaQuest] Service Worker registered. Scope:', reg.scope);
+          // Listen for messages from SW (e.g., background sync trigger)
+          navigator.serviceWorker.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'SYNC_OFFLINE_PROGRESS') {
+              if (typeof syncOfflineProgress === 'function') syncOfflineProgress();
+            }
+          });
+        })
+        .catch((err) => console.warn('[VidyaQuest] SW registration failed:', err));
+    });
+  }
+
+  // CDN fallback: if Chart.js didn't load, define a stub so app doesn't crash
+  window.addEventListener('DOMContentLoaded', () => {
+    if (typeof Chart === 'undefined') {
+      console.warn('[VidyaQuest] Chart.js not loaded (offline?). Using stub.');
+      window.Chart = function() {
+        return {
+          destroy: function() {},
+          update: function() {}
+        };
+      };
+    }
+    if (typeof marked === 'undefined') {
+      window.marked = { parse: (s) => s };
+    }
+  });
+</script>
 </body>
 </html>
