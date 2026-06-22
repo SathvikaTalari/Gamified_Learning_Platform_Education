@@ -1903,7 +1903,7 @@ async function showStudentFocusDetail(studentId, name, avatar) {
 
   try {
     const data = await api(`/api/teacher/student/${studentId}/focus`);
-    const { totals, lessons } = data;
+    const { totals, lessons, learningDNA } = data;
     const eff = totals.total_focus + totals.total_distracted > 0
       ? Math.round(totals.total_focus / (totals.total_focus + totals.total_distracted) * 100)
       : 100;
