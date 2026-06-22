@@ -2128,7 +2128,7 @@ function handleChatKeypress(e) {
   if (e.key === 'Enter') sendChatMessage();
 }
 
-function appendChatMessage(text, sender) {
+function appendTutorChatMessage(text, sender) {
   const messagesDiv = document.getElementById('chat-messages');
   const msgDiv = document.createElement('div');
   msgDiv.className = `chat-message ${sender}-message`;
@@ -2163,7 +2163,7 @@ async function sendChatMessage() {
   if (!message) return;
 
   // Append user message
-  appendChatMessage(message, 'user');
+  appendTutorChatMessage(message, 'user');
   inputEl.value = '';
   inputEl.disabled = true;
 
@@ -2176,10 +2176,10 @@ async function sendChatMessage() {
       language: currentLanguage || 'en' 
     });
     removeTypingIndicator();
-    appendChatMessage(res.reply, 'ai');
+    appendTutorChatMessage(res.reply, 'ai');
   } catch (error) {
     removeTypingIndicator();
-    appendChatMessage('⚠️ ' + (error.message || 'Sorry, I am offline right now.'), 'error');
+    appendTutorChatMessage('⚠️ ' + (error.message || 'Sorry, I am offline right now.'), 'error');
   } finally {
     inputEl.disabled = false;
     inputEl.focus();
