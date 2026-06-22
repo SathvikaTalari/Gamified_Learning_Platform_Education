@@ -285,13 +285,16 @@ function loginSuccess(data) {
   let prefs = ["en"];
   try { if (currentUser.preferred_languages) prefs = JSON.parse(currentUser.preferred_languages); } catch(e) {}
   currentUser.preferred_languages_array = prefs;
-  currentLanguage = prefs[0] || currentUser.language || 'en';
+
+  // Use saved preference if it exists in the user's language list
+  const savedLang = localStorage.getItem('vq_lang_' + currentUser.id);
+  currentLanguage = (savedLang && prefs.includes(savedLang)) ? savedLang : (prefs[0] || currentUser.language || 'en');
   
   localStorage.setItem('vq_token', currentToken);
   
   const langSwitcher = document.getElementById('lang-switcher');
   if (langSwitcher) {
-    const langNames = { 'en': 'EN', 'hi': 'हि', 'te': 'తె', 'mr': 'म', 'or': 'ଓଡ଼' };
+    const langNames = { 'en': 'EN 🇬🇧', 'hi': 'हि 🇮🇳', 'te': 'తె 🇮🇳', 'mr': 'म 🇮🇳', 'or': 'ଓଡ଼ 🇮🇳' };
     langSwitcher.innerHTML = prefs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
     langSwitcher.value = currentLanguage;
   }
@@ -306,7 +309,12 @@ function loginSuccess(data) {
   } else {
     showScreen('home');
   }
+  // Trigger live translation if user chose a non-English language
+  if (currentLanguage && currentLanguage !== 'en' && typeof TranslationEngine !== 'undefined') {
+    setTimeout(() => TranslationEngine.translatePage(currentLanguage), 700);
+  }
 }
+
 
 function showAuthError(msg) {
   const el = document.getElementById('auth-error');
@@ -324,8 +332,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     try {
       const profile = await api('/api/profile');
       currentUser = profile;
-      currentLanguage = currentUser.language || 'en';
-      document.getElementById('lang-switcher').value = currentLanguage;
+
+      // Restore preferred languages for this user
+      let prefs = ['en'];
+      try { if (currentUser.preferred_languages) prefs = JSON.parse(currentUser.preferred_languages); } catch(e) {}
+      currentUser.preferred_languages_array = prefs;
+
+      // Use saved language preference (localStorage overrides profile default)
+      const savedLang = localStorage.getItem('vq_lang_' + currentUser.id);
+      currentLanguage = (savedLang && prefs.includes(savedLang)) ? savedLang : (prefs[0] || currentUser.language || 'en');
+
+      // Populate lang switcher with only user's chosen languages
+      const langSwitcher = document.getElementById('lang-switcher');
+      if (langSwitcher) {
+        const langNames = { 'en': 'EN 🇬🇧', 'hi': 'हि 🇮🇳', 'te': 'తె 🇮🇳', 'mr': 'म 🇮🇳', 'or': 'ଓଡ़ 🇮🇳' };
+        langSwitcher.innerHTML = prefs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
+        langSwitcher.value = currentLanguage;
+      }
+
       document.getElementById('auth-screen').classList.remove('active');
       document.getElementById('auth-screen').classList.add('hidden');
       document.getElementById('main-screen').classList.remove('hidden');
@@ -335,6 +359,10 @@ window.addEventListener('DOMContentLoaded', async () => {
         showScreen('teacher-home');
       } else {
         showScreen('home');
+      }
+      // Trigger live translation on auto-login
+      if (currentLanguage && currentLanguage !== 'en' && typeof TranslationEngine !== 'undefined') {
+        setTimeout(() => TranslationEngine.translatePage(currentLanguage), 800);
       }
     } catch { localStorage.removeItem('vq_token'); currentToken = null; }
   }
@@ -410,7 +438,18 @@ function updateNavStats() {
 
 function switchLanguage(lang) {
   currentLanguage = lang;
-  if (currentUser) currentUser.language = lang;
+  if (currentUser) {
+    currentUser.language = lang;
+    // Persist per-user language preference
+    localStorage.setItem('vq_lang_' + currentUser.id, lang);
+  }
+  // Live-translate the entire visible page
+  if (typeof TranslationEngine !== 'undefined') {
+    TranslationEngine.translatePage(lang);
+  }
+  // Update html lang attribute for accessibility
+  const langMap = { en: 'en', hi: 'hi', te: 'te', mr: 'mr', or: 'or' };
+  document.getElementById('html-root').lang = langMap[lang] || 'en';
 }
 
 // ===== HOME & DASHBOARD =====

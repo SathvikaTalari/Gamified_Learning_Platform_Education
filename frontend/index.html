@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" id="html-root">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -17,6 +17,7 @@
 <div id="app">
   <!-- AUTH SCREEN -->
   <div id="auth-screen" class="screen active">
+    <button class="theme-toggle-btn auth-theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
     <div class="auth-bg">
       <div class="floating-shapes">
         <span class="shape s1">🔢</span><span class="shape s2">🔬</span>
@@ -32,8 +33,8 @@
         <p class="logo-sub-hi">हर छात्र के लिए STEM शिक्षा</p>
       </div>
       <div class="auth-tabs">
-        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')">Login / लॉगिन</button>
-        <button class="tab-btn" id="tab-register" onclick="switchTab('register')">Register / रजिस्टर</button>
+        <button class="tab-btn active" id="tab-login" onclick="switchTab('login')"><span data-i18n>Login</span> / लॉगिन</button>
+        <button class="tab-btn" id="tab-register" onclick="switchTab('register')"><span data-i18n>Register</span> / रजिस्टर</button>
       </div>
 
       <!-- LOGIN FORM -->
@@ -117,7 +118,7 @@
             <input type="text" id="reg-school" placeholder="School Name / विद्यालय का नाम">
           </div>
           <div class="input-group" style="flex-direction: column; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 15px;">
-            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 Select exactly 3 languages:</label>
+            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 <span data-i18n>Select exactly 3 languages:</span></label>
             <div id="reg-languages" style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem;">
               <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="en" checked> English</label>
               <label style="cursor: pointer;"><input type="checkbox" class="lang-checkbox" value="hi" checked> हिंदी (Hindi)</label>
@@ -159,7 +160,7 @@
             </select>
           </div>
           <div class="input-group" style="flex-direction: column; align-items: flex-start; padding: 10px; background: rgba(0,0,0,0.2); border-radius: 12px; margin-bottom: 15px;">
-            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 Select exactly 3 languages:</label>
+            <label style="font-size: 0.9rem; color: var(--text2); margin-bottom: 8px;">🌐 <span data-i18n>Select exactly 3 languages:</span></label>
             <div id="reg-teacher-languages" style="display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.9rem;">
               <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="en" checked> English</label>
               <label style="cursor: pointer;"><input type="checkbox" class="teacher-lang-checkbox" value="hi" checked> हिंदी (Hindi)</label>
@@ -169,7 +170,7 @@
           </div>
         </div>
 
-        <button class="btn-primary" id="btn-register" onclick="handleRegister()">Join VidyaQuest 🌟</button>
+        <button class="btn-primary" id="btn-register" onclick="handleRegister()"><span data-i18n>Join VidyaQuest</span> 🌟</button>
       </div>
       <div id="auth-error" class="error-msg hidden"></div>
     </div>
@@ -193,6 +194,7 @@
           <option value="mr">म</option>
           <option value="or">ଓଡ଼</option>
         </select>
+        <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
         <button class="avatar-btn" onclick="showScreen('profile')">
           <span id="nav-avatar">🧑‍🎓</span>
         </button>
@@ -202,38 +204,38 @@
     <!-- BOTTOM NAV (Student) -->
     <nav class="bottom-nav" id="student-nav">
       <button class="nav-item active" onclick="showScreen('home')" data-screen="home">
-        <span class="nav-icon">🏠</span><span class="nav-label">Home</span>
+        <span class="nav-icon">🏠</span><span class="nav-label" data-i18n>Home</span>
       </button>
       <button class="nav-item" onclick="showScreen('subjects')" data-screen="subjects">
-        <span class="nav-icon">📚</span><span class="nav-label">Learn</span>
+        <span class="nav-icon">📚</span><span class="nav-label" data-i18n>Learn</span>
       </button>
       <button class="nav-item" onclick="showScreen('leaderboard')" data-screen="leaderboard">
-        <span class="nav-icon">🏆</span><span class="nav-label">Rank</span>
+        <span class="nav-icon">🏆</span><span class="nav-label" data-i18n>Rank</span>
       </button>
       <button class="nav-item" onclick="showScreen('badges')" data-screen="badges">
-        <span class="nav-icon">🎖️</span><span class="nav-label">Badges</span>
+        <span class="nav-icon">🎖️</span><span class="nav-label" data-i18n>Badges</span>
       </button>
       <button class="nav-item scan-nav-btn" onclick="showScanSolve()" data-screen="scan-solve">
-        <span class="nav-icon">📷</span><span class="nav-label">Scan</span>
+        <span class="nav-icon">📷</span><span class="nav-label" data-i18n>Scan</span>
       </button>
       <button class="nav-item" onclick="showScreen('profile')" data-screen="profile">
-        <span class="nav-icon">👤</span><span class="nav-label">Me</span>
+        <span class="nav-icon">👤</span><span class="nav-label" data-i18n>Me</span>
       </button>
     </nav>
 
     <!-- BOTTOM NAV (Teacher) -->
     <nav class="bottom-nav hidden" id="teacher-nav">
       <button class="nav-item active" onclick="showScreen('teacher-home')" data-screen="teacher-home">
-        <span class="nav-icon">📊</span><span class="nav-label">Dashboard</span>
+        <span class="nav-icon">📊</span><span class="nav-label" data-i18n>Dashboard</span>
       </button>
       <button class="nav-item" onclick="showScreen('create-lesson')" data-screen="create-lesson">
-        <span class="nav-icon">✏️</span><span class="nav-label">Create</span>
+        <span class="nav-icon">✏️</span><span class="nav-label" data-i18n>Create</span>
       </button>
       <button class="nav-item" onclick="showScreen('my-content')" data-screen="my-content">
-        <span class="nav-icon">📋</span><span class="nav-label">My Content</span>
+        <span class="nav-icon">📋</span><span class="nav-label" data-i18n>My Content</span>
       </button>
       <button class="nav-item" onclick="showScreen('profile')" data-screen="profile">
-        <span class="nav-icon">👤</span><span class="nav-label">Me</span>
+        <span class="nav-icon">👤</span><span class="nav-label" data-i18n>Me</span>
       </button>
     </nav>
 
@@ -244,8 +246,8 @@
       <div id="screen-teacher-home" class="inner-screen">
         <div class="teacher-dash-header">
           <div>
-            <h2 class="screen-title" id="teacher-greeting">Good Morning, Teacher! 👩‍🏫</h2>
-            <p class="screen-subtitle" id="teacher-subtitle">Here's how your students are doing today</p>
+            <h2 class="screen-title" id="teacher-greeting"><span data-i18n>Good Morning, Teacher!</span> 👩‍🏫</h2>
+            <p class="screen-subtitle" id="teacher-subtitle" data-i18n>Here's how your students are doing today</p>
           </div>
         </div>
 
@@ -254,22 +256,22 @@
           <div class="teacher-stat-card" style="border-color:var(--purple)">
             <div class="tsc-icon">👥</div>
             <div class="tsc-val" id="t-total-students">–</div>
-            <div class="tsc-label">Students Enrolled</div>
+            <div class="tsc-label" data-i18n>Students Enrolled</div>
           </div>
           <div class="teacher-stat-card" style="border-color:var(--secondary)">
             <div class="tsc-icon">📈</div>
             <div class="tsc-val" id="t-avg-score">–</div>
-            <div class="tsc-label">Class Avg Score</div>
+            <div class="tsc-label" data-i18n>Class Avg Score</div>
           </div>
           <div class="teacher-stat-card" style="border-color:#FF6B6B">
             <div class="tsc-icon">⚠️</div>
             <div class="tsc-val" id="t-at-risk-count">–</div>
-            <div class="tsc-label">At-Risk Students</div>
+            <div class="tsc-label" data-i18n>At-Risk Students</div>
           </div>
           <div class="teacher-stat-card" style="border-color:var(--accent)">
             <div class="tsc-icon">📝</div>
             <div class="tsc-val" id="t-my-lessons">–</div>
-            <div class="tsc-label">My Lessons</div>
+            <div class="tsc-label" data-i18n>My Lessons</div>
           </div>
         </div>
 
@@ -277,25 +279,25 @@
           <div class="dash-col">
             <!-- Subject Engagement -->
             <div class="dash-card">
-              <h3 class="dash-title">📚 Subject Engagement</h3>
+              <h3 class="dash-title">📚 <span data-i18n>Subject Engagement</span></h3>
               <div id="t-subject-stats" class="dash-list"></div>
             </div>
             <!-- Most Attempted -->
             <div class="dash-card">
-              <h3 class="dash-title">🔥 Most Attempted Topics</h3>
+              <h3 class="dash-title">🔥 <span data-i18n>Most Attempted Topics</span></h3>
               <div id="t-most-attempted" class="dash-list"></div>
             </div>
             <!-- Least Attempted -->
             <div class="dash-card">
-              <h3 class="dash-title">😴 Least Attempted Topics</h3>
+              <h3 class="dash-title">😴 <span data-i18n>Least Attempted Topics</span></h3>
               <div id="t-least-attempted" class="dash-list"></div>
             </div>
 
             <!-- Group Challenges (Teacher) -->
             <div class="dash-card" style="border-left: 4px solid var(--purple);">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 class="dash-title" style="margin:0;">👥 Study Group Challenges</h3>
-                <button class="btn-primary" onclick="openCreateChallengeModal()" style="padding:6px 12px; font-size:0.75rem; margin:0;">+ Create Challenge</button>
+                <h3 class="dash-title" style="margin:0;">👥 <span data-i18n>Study Group Challenges</span></h3>
+                <button class="btn-primary" onclick="openCreateChallengeModal()" style="padding:6px 12px; font-size:0.75rem; margin:0;"><span data-i18n>+ Create Challenge</span></button>
               </div>
               <div id="t-challenges-list" class="dash-list">
                 <div class="empty-state">Loading challenges...</div>
@@ -305,17 +307,17 @@
           <div class="dash-col">
             <!-- At-Risk Alert -->
             <div class="dash-card at-risk-card">
-              <h3 class="dash-title" style="color:#FF6B6B">🚨 At-Risk Students <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)">(no activity in 7 days)</span></h3>
+              <h3 class="dash-title" style="color:#FF6B6B">🚨 <span data-i18n>At-Risk Students</span> <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)" data-i18n>(no activity in 7 days)</span></h3>
               <div id="t-at-risk" class="dash-list"></div>
             </div>
             <!-- Focus & Gaze Analytics -->
             <div class="dash-card">
-              <h3 class="dash-title">🧠 Student Focus & Engagement</h3>
+              <h3 class="dash-title">🧠 <span data-i18n>Student Focus & Engagement</span></h3>
               <div id="t-focus-metrics" class="dash-list"></div>
             </div>
             <!-- Recent Submissions -->
             <div class="dash-card">
-              <h3 class="dash-title">📥 Recent Quiz Submissions</h3>
+              <h3 class="dash-title">📥 <span data-i18n>Recent Quiz Submissions</span></h3>
               <div id="t-recent-submissions" class="dash-list"></div>
             </div>
           </div>
@@ -324,21 +326,21 @@
 
       <!-- CREATE LESSON SCREEN -->
       <div id="screen-create-lesson" class="inner-screen">
-        <h2 class="screen-title">✏️ Create New Lesson</h2>
-        <p class="screen-subtitle">Add content and quiz questions for students</p>
+        <h2 class="screen-title">✏️ <span data-i18n>Create New Lesson</span></h2>
+        <p class="screen-subtitle" data-i18n>Add content and quiz questions for students</p>
         <div class="create-form-wrap">
           <!-- Step 1: Lesson Info -->
           <div class="dash-card">
-            <h3 class="dash-title">📋 Lesson Details</h3>
+            <h3 class="dash-title">📋 <span data-i18n>Lesson Details</span></h3>
             <div class="form-grid">
               <div class="form-group">
-                <label class="form-label">Subject *</label>
+                <label class="form-label" data-i18n>Subject *</label>
                 <select id="cl-subject" class="form-control">
                   <option value="">Select subject...</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">Grade Level</label>
+                <label class="form-label" data-i18n>Grade Level</label>
                 <select id="cl-grade" class="form-control">
                   <option value="6">Grade 6</option><option value="7">Grade 7</option>
                   <option value="8">Grade 8</option><option value="9">Grade 9</option>
@@ -346,7 +348,7 @@
                 </select>
               </div>
               <div class="form-group span-2">
-                <label class="form-label">Lesson Title *</label>
+                <label class="form-label" data-i18n>Lesson Title *</label>
                 <input id="cl-title" type="text" class="form-control" placeholder="e.g. Quadratic Equations">
               </div>
               <div class="form-group">
@@ -366,9 +368,9 @@
 
           <!-- Step 2: Content -->
           <div class="dash-card">
-            <h3 class="dash-title">📖 Lesson Content</h3>
+            <h3 class="dash-title">📖 <span data-i18n>Lesson Content</span></h3>
             <div class="form-group">
-              <label class="form-label">Introduction *</label>
+              <label class="form-label" data-i18n>Introduction *</label>
               <textarea id="cl-intro" class="form-control form-textarea" placeholder="Write an engaging introduction for students..."></textarea>
             </div>
             <div class="form-group" style="margin-top:12px">
@@ -395,15 +397,15 @@
           </div>
 
           <div id="create-lesson-error" class="error-msg hidden"></div>
-          <button class="btn-primary" onclick="handleCreateLesson()">🚀 Publish Lesson</button>
+          <button class="btn-primary" onclick="handleCreateLesson()">🚀 <span data-i18n>Publish Lesson</span></button>
           <div style="height:8px"></div>
         </div>
       </div>
 
       <!-- MY CONTENT SCREEN -->
       <div id="screen-my-content" class="inner-screen">
-        <h2 class="screen-title">📋 My Created Content</h2>
-        <p class="screen-subtitle">Lessons you've added for students</p>
+        <h2 class="screen-title">📋 <span data-i18n>My Created Content</span></h2>
+        <p class="screen-subtitle" data-i18n>Lessons you've added for students</p>
         <div id="my-content-list" class="dash-list" style="max-width:800px;margin:0 auto"></div>
       </div>
 
@@ -428,7 +430,7 @@
           <div class="daily-streak-box">
             <div class="streak-fire">🔥</div>
             <div class="streak-count"><span id="home-streak">0</span></div>
-            <div class="streak-label">Day Streak</div>
+            <div class="streak-label" data-i18n>Day Streak</div>
           </div>
         </div>
 
@@ -446,36 +448,36 @@
           <!-- Left Column -->
           <div class="dash-col">
             <div class="dash-card battle-dash-card" style="border-left: 4px solid var(--primary); background: linear-gradient(135deg, rgba(255, 107, 53, 0.08), rgba(123, 104, 238, 0.08));">
-              <h3 class="dash-title" style="color: var(--primary);">⚔️ Live Quiz Battle</h3>
-              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;">Challenge your classmates to a real-time STEM quiz battle and earn 2x XP! / क्लासमेट को चुनौती दें!</p>
+              <h3 class="dash-title" style="color: var(--primary);">⚔️ <span data-i18n>Live Quiz Battle</span></h3>
+              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;" data-i18n>Challenge your classmates to a real-time STEM quiz battle and earn 2x XP!</p>
               <button class="btn-primary" onclick="showScreen('quiz-battle-lobby')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                Challenge a Friend ⚔️
+                <span data-i18n>Challenge a Friend</span> ⚔️
               </button>
             </div>
 
             <!-- COLLABORATIVE GROUP CHALLENGES CARD -->
             <div class="dash-card group-dash-card" style="border-left: 4px solid var(--purple); background: linear-gradient(135deg, rgba(123, 104, 238, 0.08), rgba(64, 224, 208, 0.08));">
-              <h3 class="dash-title" style="color: var(--purple);">👥 Study Groups & Challenges</h3>
-              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;">Form study groups, complete lessons together, and earn shared badges displayed on all members' profiles!</p>
+              <h3 class="dash-title" style="color: var(--purple);">👥 <span data-i18n>Study Groups & Challenges</span></h3>
+              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;" data-i18n>Form study groups, complete lessons together, and earn shared badges displayed on all members' profiles!</p>
               <button class="btn-primary" onclick="showScreen('groups')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                Join Study Group 👥
+                <span data-i18n>Join Study Group</span> 👥
               </button>
             </div>
 
             <div class="dash-card">
-              <h3 class="dash-title">📊 Weekly XP Progress</h3>
+              <h3 class="dash-title">📊 <span data-i18n>Weekly XP Progress</span></h3>
               <div class="chart-container">
                 <canvas id="weeklyXpChart"></canvas>
               </div>
             </div>
 
             <div class="dash-card">
-              <h3 class="dash-title">📖 Continue Learning</h3>
+              <h3 class="dash-title">📖 <span data-i18n>Continue Learning</span></h3>
               <div id="home-subjects" class="subjects-grid-home"></div>
             </div>
 
             <div class="dash-card">
-              <h3 class="dash-title">🌟 Did You Know?</h3>
+              <h3 class="dash-title">🌟 <span data-i18n>Did You Know?</span></h3>
               <div id="fun-fact-card" class="fun-fact-card">
                 <div class="fun-fact-icon">💡</div>
                 <div id="fun-fact-text" class="fun-fact-text">Loading...</div>
@@ -486,25 +488,25 @@
           <!-- Right Column -->
           <div class="dash-col">
             <div class="dash-card">
-              <h3 class="dash-title">📅 Upcoming Tasks</h3>
+              <h3 class="dash-title">📅 <span data-i18n>Upcoming Tasks</span></h3>
               <div id="dash-upcoming-tasks" class="dash-list">
                 <div class="empty-state">Loading tasks...</div>
               </div>
             </div>
 
             <div class="dash-card">
-              <h3 class="dash-title">🕒 Recent Activity</h3>
+              <h3 class="dash-title">🕒 <span data-i18n>Recent Activity</span></h3>
               <div id="dash-recent-activity" class="dash-list">
                  <div class="empty-state">Loading activity...</div>
               </div>
             </div>
 
             <div class="dash-card">
-              <h3 class="dash-title">🎖️ Badges Showcase</h3>
+              <h3 class="dash-title">🎖️ <span data-i18n>Badges Showcase</span></h3>
               <div id="dash-badges" class="dash-badges-grid">
                  <div class="empty-state">Loading badges...</div>
               </div>
-              <button class="btn-text-small" onclick="showScreen('badges')">View All Badges →</button>
+              <button class="btn-text-small" onclick="showScreen('badges')"><span data-i18n>View All Badges</span> →</button>
             </div>
           </div>
         </div>
@@ -512,8 +514,8 @@
 
       <!-- SUBJECTS -->
       <div id="screen-subjects" class="inner-screen">
-        <h2 class="screen-title">Choose Subject</h2>
-        <p class="screen-subtitle" id="subjects-subtitle">Select a subject to start learning</p>
+        <h2 class="screen-title" data-i18n>Choose Subject</h2>
+        <p class="screen-subtitle" id="subjects-subtitle" data-i18n>Select a subject to start learning</p>
         <div id="subjects-grid" class="subjects-grid"></div>
       </div>
 
@@ -572,15 +574,15 @@
 
       <!-- LEADERBOARD -->
       <div id="screen-leaderboard" class="inner-screen">
-        <h2 class="screen-title">🏆 Leaderboard</h2>
-        <p class="screen-subtitle">Top students this month</p>
+        <h2 class="screen-title">🏆 <span data-i18n>Leaderboard</span></h2>
+        <p class="screen-subtitle" data-i18n>Top students this month</p>
         <div id="leaderboard-list" class="leaderboard-list"></div>
       </div>
 
       <!-- BADGES -->
       <div id="screen-badges" class="inner-screen">
-        <h2 class="screen-title">🎖️ My Badges</h2>
-        <p class="screen-subtitle">Earn badges by completing challenges!</p>
+        <h2 class="screen-title">🎖️ <span data-i18n>My Badges</span></h2>
+        <p class="screen-subtitle" data-i18n>Earn badges by completing challenges!</p>
         <div id="badges-grid" class="badges-grid"></div>
       </div>
 
@@ -592,30 +594,30 @@
       <!-- ===== STUDENT FOCUS HISTORY SCREEN ===== -->
       <div id="screen-my-focus" class="inner-screen">
         <button class="back-btn" onclick="showScreen('profile')">← Back</button>
-        <h2 class="screen-title">🧠 My Focus History</h2>
-        <p class="screen-subtitle">Track your attention across all lessons</p>
+        <h2 class="screen-title">🧠 <span data-i18n>My Focus History</span></h2>
+        <p class="screen-subtitle" data-i18n>Track your attention across all lessons</p>
 
         <!-- Overall Stats Row -->
         <div id="mf-overall-stats" class="mf-stats-row">
           <div class="mf-stat-card">
             <div class="mf-stat-icon" style="color:#22c55e;">⏱️</div>
             <div class="mf-stat-val" id="mf-total-focus">—</div>
-            <div class="mf-stat-label">Total Focus</div>
+            <div class="mf-stat-label" data-i18n>Total Focus</div>
           </div>
           <div class="mf-stat-card">
             <div class="mf-stat-icon" style="color:#ef4444;">👀</div>
             <div class="mf-stat-val" id="mf-total-events">—</div>
-            <div class="mf-stat-label">Distractions</div>
+            <div class="mf-stat-label" data-i18n>Distractions</div>
           </div>
           <div class="mf-stat-card">
             <div class="mf-stat-icon" style="color:#a855f7;">🏆</div>
             <div class="mf-stat-val" id="mf-best-streak">—</div>
-            <div class="mf-stat-label">Best Streak</div>
+            <div class="mf-stat-label" data-i18n>Best Streak</div>
           </div>
           <div class="mf-stat-card">
             <div class="mf-stat-icon" style="color:#f59e0b;">⚡</div>
             <div class="mf-stat-val" id="mf-total-xp">—</div>
-            <div class="mf-stat-label">Focus XP</div>
+            <div class="mf-stat-label" data-i18n>Focus XP</div>
           </div>
         </div>
 
@@ -634,9 +636,9 @@
         <div class="dashboard-grid">
           <!-- Create Room -->
           <div class="dash-card">
-            <h3 class="dash-title">🆕 Create Battle Arena</h3>
+            <h3 class="dash-title">🆕 <span data-i18n>Create Battle Arena</span></h3>
             <div class="form-group" style="margin-bottom:15px;">
-              <label class="form-label">Choose Subject / विषय चुनें</label>
+              <label class="form-label"><span data-i18n>Choose Subject</span> / विषय चुनें</label>
               <select id="battle-subject" class="form-control">
                 <option value="any">Any Subject / सभी विषय</option>
                 <option value="math">🔢 Mathematics / गणित</option>
@@ -645,17 +647,17 @@
                 <option value="eng">⚙️ Engineering / इंजीनियरिंग</option>
               </select>
             </div>
-            <button class="btn-primary" style="width:100%;" onclick="createBattleRoom()">Create Battle Room ⚔️</button>
+            <button class="btn-primary" style="width:100%;" onclick="createBattleRoom()"><span data-i18n>Create Battle Room</span> ⚔️</button>
           </div>
 
           <!-- Join Room -->
           <div class="dash-card">
-            <h3 class="dash-title">🚪 Join Arena</h3>
+            <h3 class="dash-title">🚪 <span data-i18n>Join Arena</span></h3>
             <div class="form-group" style="margin-bottom:15px;">
-              <label class="form-label">Enter 6-Digit Code / कोड दर्ज करें</label>
+              <label class="form-label"><span data-i18n>Enter 6-Digit Code</span> / कोड दर्ज करें</label>
               <input type="text" id="battle-room-code" class="form-control" placeholder="e.g. 123456" maxlength="6" style="text-align:center; font-size:1.5rem; letter-spacing:4px; font-weight:700;">
             </div>
-            <button class="btn-secondary" style="width:100%; border-color:var(--secondary); color:var(--secondary); font-family:'Baloo 2', cursive;" onclick="joinBattleRoom()">Join Room 🚪</button>
+            <button class="btn-secondary" style="width:100%; border-color:var(--secondary); color:var(--secondary); font-family:'Baloo 2', cursive;" onclick="joinBattleRoom()"><span data-i18n>Join Room</span> 🚪</button>
           </div>
         </div>
 
@@ -950,10 +952,10 @@
 <div id="badge-modal" class="modal hidden">
   <div class="modal-box badge-earned-box">
     <div class="badge-earned-icon" id="badge-modal-icon">🏆</div>
-    <h3>Badge Earned!</h3>
+    <h3 data-i18n>Badge Earned!</h3>
     <h2 id="badge-modal-name">Scholar</h2>
     <p id="badge-modal-desc">You reached 500 XP!</p>
-    <button class="btn-primary" onclick="closeBadgeModal()">Awesome! 🎉</button>
+    <button class="btn-primary" onclick="closeBadgeModal()"><span data-i18n>Awesome!</span> 🎉</button>
   </div>
 </div>
 
@@ -972,7 +974,7 @@
 <div id="ai-chat-window" class="chat-window hidden">
   <div class="chat-header">
     <div class="chat-title">
-      🤖 <span id="chat-header-text">VidyaQuest AI Tutor</span>
+      🤖 <span id="chat-header-text" data-i18n>VidyaQuest AI Tutor</span>
     </div>
     <button class="btn-close-chat" onclick="toggleChat()">✕</button>
   </div>
@@ -1208,6 +1210,7 @@
 <script src="/socket.io/socket.io.js"></script>
 <script src="js/pico.js"></script>
 <script src="js/games.js"></script>
+<script src="js/translations.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>
