@@ -21,6 +21,33 @@ let currentSubjectDesc = '';
 
 const API = '';
 
+// ===== THEME TOGGLE =====
+function initTheme() {
+  const savedTheme = localStorage.getItem('vq_theme');
+  const isLight = savedTheme === 'light';
+  if (isLight) {
+    document.documentElement.classList.add('light-theme');
+  } else {
+    document.documentElement.classList.remove('light-theme');
+  }
+}
+
+function toggleTheme() {
+  const isLight = document.documentElement.classList.toggle('light-theme');
+  localStorage.setItem('vq_theme', isLight ? 'light' : 'dark');
+  updateThemeButtons(isLight);
+}
+
+function updateThemeButtons(isLight) {
+  const buttons = document.querySelectorAll('.theme-toggle-btn');
+  buttons.forEach(btn => {
+    btn.innerHTML = isLight ? '☀️' : '🌙';
+  });
+}
+
+// Initialize theme immediately on script load to avoid style flash
+initTheme();
+
 // ===== TRANSLATIONS =====
 const T = {
   en: {
@@ -326,6 +353,9 @@ function showAuthError(msg) {
 
 // ===== INIT =====
 window.addEventListener('DOMContentLoaded', async () => {
+  // Sync toggle button icons with the current theme state
+  updateThemeButtons(document.documentElement.classList.contains('light-theme'));
+
   const token = localStorage.getItem('vq_token');
   if (token) {
     currentToken = token;
