@@ -14,9 +14,9 @@
 <link rel="stylesheet" href="css/main.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js" defer></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 </head>
 <body>
 <!-- CONNECTIVITY STATUS BANNER -->
@@ -28,7 +28,14 @@
 <div id="app">
   <!-- AUTH SCREEN -->
   <div id="auth-screen" class="screen active">
-    <button class="theme-toggle-btn auth-theme-toggle" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
+    <div class="auth-top-controls">
+      <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
+      <select onchange="switchLanguage(this.value)" class="auth-lang-select" title="Choose Language">
+        <option value="en">🇬🇧 English</option>
+        <option value="hi">🇮🇳 हिंदी (Hindi)</option>
+        <option value="mr">🇮🇳 मराठी (Marathi)</option>
+      </select>
+    </div>
     <div class="auth-bg">
       <div class="floating-shapes">
         <span class="shape s1">🔢</span><span class="shape s2">🔬</span>
@@ -199,6 +206,17 @@
         <div class="stat-pill streak-pill">🔥 <span id="nav-streak">0</span></div>
       </div>
       <div class="nav-right">
+        <!-- Smart Focus Mode Toggle -->
+        <div class="smart-focus-toggle-wrap" title="Smart Focus Mode: AI watches your expressions to personalise difficulty">
+          <div class="smart-focus-toggle-label">
+            <span class="sf-icon">🧠</span>
+            <span class="sf-text">Focus AI</span>
+          </div>
+          <label class="sf-switch" id="smart-focus-switch-label">
+            <input type="checkbox" id="smart-focus-toggle" onchange="onSmartFocusToggle(this.checked)">
+            <span class="sf-slider"></span>
+          </label>
+        </div>
         <select id="lang-switcher" onchange="switchLanguage(this.value)" class="lang-select">
           <option value="en">EN</option>
           <option value="hi">हि</option>
@@ -215,10 +233,19 @@
     <!-- BOTTOM NAV (Student) -->
     <nav class="bottom-nav" id="student-nav">
       <button class="nav-item active" onclick="showScreen('home')" data-screen="home">
-        <span class="nav-icon">🏠</span><span class="nav-label" data-i18n>Home</span>
+        <span class="nav-icon">🏠</span><span class="nav-label" data-i18n>Dashboard</span>
       </button>
       <button class="nav-item" onclick="showScreen('subjects')" data-screen="subjects">
         <span class="nav-icon">📚</span><span class="nav-label" data-i18n>Learn</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('labs')" data-screen="labs">
+        <span class="nav-icon">🧪</span><span class="nav-label" data-i18n>Labs</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('quiz-battle-lobby')" data-screen="quiz-battle-lobby">
+        <span class="nav-icon">⚔️</span><span class="nav-label" data-i18n>Battle</span>
+      </button>
+      <button class="nav-item" onclick="showScreen('groups')" data-screen="groups">
+        <span class="nav-icon">👥</span><span class="nav-label" data-i18n>Groups</span>
       </button>
       <button class="nav-item" onclick="showScreen('leaderboard')" data-screen="leaderboard">
         <span class="nav-icon">🏆</span><span class="nav-label" data-i18n>Rank</span>
@@ -227,7 +254,7 @@
         <span class="nav-icon">🎖️</span><span class="nav-label" data-i18n>Badges</span>
       </button>
       <button class="nav-item scan-nav-btn" onclick="showScanSolve()" data-screen="scan-solve">
-        <span class="nav-icon">📷</span><span class="nav-label" data-i18n>Scan</span>
+        <span class="nav-icon">📷</span><span class="nav-label" data-i18n>Scan & Solve</span>
       </button>
       <button class="nav-item" onclick="showScreen('profile')" data-screen="profile">
         <span class="nav-icon">👤</span><span class="nav-label" data-i18n>Me</span>
@@ -255,81 +282,218 @@
 
       <!-- TEACHER DASHBOARD -->
       <div id="screen-teacher-home" class="inner-screen">
-        <div class="teacher-dash-header">
+        <div class="teacher-dash-header" style="margin-bottom:20px;">
           <div>
             <h2 class="screen-title" id="teacher-greeting"><span data-i18n>Good Morning, Teacher!</span> 👩‍🏫</h2>
             <p class="screen-subtitle" id="teacher-subtitle" data-i18n>Here's how your students are doing today</p>
           </div>
         </div>
 
-        <!-- Top Stat Cards -->
-        <div class="teacher-stat-row">
-          <div class="teacher-stat-card" style="border-color:var(--purple)">
-            <div class="tsc-icon">👥</div>
-            <div class="tsc-val" id="t-total-students">–</div>
-            <div class="tsc-label" data-i18n>Students Enrolled</div>
+        <!-- Dashboard Filters Header -->
+        <div class="teacher-dashboard-filters">
+          <div class="filter-dropdown-group">
+            <div class="filter-select-wrap">
+              <select id="teacher-filter-year" class="filter-select" onchange="filterTeacherDashboard()">
+                <option value="2026">Select Year (2026)</option>
+                <option value="2025">2025</option>
+              </select>
+            </div>
+            <div class="filter-select-wrap">
+              <select id="teacher-filter-grade" class="filter-select" onchange="filterTeacherDashboard()">
+                <option value="all">Select Grade (All)</option>
+                <option value="6">Grade 6</option>
+                <option value="7">Grade 7</option>
+                <option value="8">Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+              </select>
+            </div>
           </div>
-          <div class="teacher-stat-card" style="border-color:var(--secondary)">
-            <div class="tsc-icon">📈</div>
-            <div class="tsc-val" id="t-avg-score">–</div>
-            <div class="tsc-label" data-i18n>Class Avg Score</div>
-          </div>
-          <div class="teacher-stat-card" style="border-color:#FF6B6B">
-            <div class="tsc-icon">⚠️</div>
-            <div class="tsc-val" id="t-at-risk-count">–</div>
-            <div class="tsc-label" data-i18n>At-Risk Students</div>
-          </div>
-          <div class="teacher-stat-card" style="border-color:var(--accent)">
-            <div class="tsc-icon">📝</div>
-            <div class="tsc-val" id="t-my-lessons">–</div>
-            <div class="tsc-label" data-i18n>My Lessons</div>
+
+          <!-- Quick Metrics Row -->
+          <div class="teacher-metrics-row">
+            <div class="teacher-metric-card">
+              <div class="metric-icon-wrap" style="color: var(--purple); background: rgba(168, 85, 247, 0.15);">
+                👥
+              </div>
+              <div class="metric-info">
+                <div class="metric-value" id="td-student-count">0</div>
+                <div class="metric-label" data-i18n>Student Count</div>
+              </div>
+            </div>
+            <div class="teacher-metric-card">
+              <div class="metric-icon-wrap" style="color: var(--secondary); background: rgba(78, 205, 196, 0.15);">
+                📋
+              </div>
+              <div class="metric-info">
+                <div class="metric-value" id="td-student-attendance">0%</div>
+                <div class="metric-label" data-i18n>Student Attendance</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div class="dashboard-grid">
-          <div class="dash-col">
-            <!-- Subject Engagement -->
-            <div class="dash-card">
-              <h3 class="dash-title">📚 <span data-i18n>Subject Engagement</span></h3>
-              <div id="t-subject-stats" class="dash-list"></div>
-            </div>
-            <!-- Most Attempted -->
-            <div class="dash-card">
-              <h3 class="dash-title">🔥 <span data-i18n>Most Attempted Topics</span></h3>
-              <div id="t-most-attempted" class="dash-list"></div>
-            </div>
-            <!-- Least Attempted -->
-            <div class="dash-card">
-              <h3 class="dash-title">😴 <span data-i18n>Least Attempted Topics</span></h3>
-              <div id="t-least-attempted" class="dash-list"></div>
-            </div>
+        <!-- Highlight Indicators Strip -->
+        <div class="teacher-highlights-strip">
+          <div class="highlight-item">
+            Student Count: <span class="hl-value up" id="hl-student-change">+4.5% 📈</span>
+          </div>
+          <div class="highlight-item">
+            Student Attendance: <span class="hl-value down" id="hl-attendance-change">-1.2% 📉</span>
+          </div>
+          <div class="highlight-item">
+            Exam Average: <span class="hl-value up" id="hl-exam-change">0% 📈</span>
+          </div>
+        </div>
 
-            <!-- Group Challenges (Teacher) -->
-            <div class="dash-card" style="border-left: 4px solid var(--purple);">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-                <h3 class="dash-title" style="margin:0;">👥 <span data-i18n>Study Group Challenges</span></h3>
-                <button class="btn-primary" onclick="openCreateChallengeModal()" style="padding:6px 12px; font-size:0.75rem; margin:0;"><span data-i18n>+ Create Challenge</span></button>
+        <!-- Middle Grid: Donut Chart & High Performers -->
+        <div class="teacher-dashboard-row">
+          <!-- Donut Card -->
+          <div class="teacher-card col-7">
+            <div class="card-header-actions">
+              <h3 class="teacher-card-title" data-i18n>Student Count</h3>
+              <div class="card-actions">
+                <span class="action-tag">Grade ⇅</span>
+                <span class="action-tag">Gender 👤</span>
               </div>
-              <div id="t-challenges-list" class="dash-list">
-                <div class="empty-state">Loading challenges...</div>
+            </div>
+            <div class="donut-chart-container">
+              <div class="canvas-wrap">
+                <canvas id="td-donut-chart"></canvas>
+              </div>
+              <div class="donut-legend" id="td-donut-legend">
+                <!-- Dynamically populated -->
               </div>
             </div>
           </div>
-          <div class="dash-col">
-            <!-- At-Risk Alert -->
-            <div class="dash-card at-risk-card">
-              <h3 class="dash-title" style="color:#FF6B6B">🚨 <span data-i18n>At-Risk Students</span> <span style="font-size:0.7rem;font-weight:normal;color:var(--text3)" data-i18n>(no activity in 7 days)</span></h3>
-              <div id="t-at-risk" class="dash-list"></div>
+
+          <!-- Highlight Cards -->
+          <div class="teacher-card col-5">
+            <div class="high-performers-grid">
+              <!-- Best in Marks -->
+              <div class="performer-mini-card">
+                <div class="p-avatar">🧑‍🎓</div>
+                <div class="p-info">
+                  <div class="p-header">
+                    <span class="p-score" id="pm-best-marks-val">0%</span>
+                    <span class="p-name" id="pm-best-marks-name">Name</span>
+                  </div>
+                  <div class="p-meta" style="margin-top:4px;">
+                    <span class="p-badge" id="pm-best-marks-grade">G6</span>
+                    <span class="p-badge">GPA 5</span>
+                    <span class="p-badge" id="pm-best-marks-attend">0% Attend</span>
+                  </div>
+                </div>
+                <div class="p-label" data-i18n>Best In Marks</div>
+              </div>
+
+              <!-- Best in Attendance -->
+              <div class="performer-mini-card">
+                <div class="p-avatar">👩‍🎓</div>
+                <div class="p-info">
+                  <div class="p-header">
+                    <span class="p-score" id="pm-best-attend-val">0%</span>
+                    <span class="p-name" id="pm-best-attend-name">Name</span>
+                  </div>
+                  <div class="p-meta" style="margin-top:4px;">
+                    <span class="p-badge" id="pm-best-attend-grade">G7</span>
+                    <span class="p-badge">GPA 4</span>
+                    <span class="p-badge" id="pm-best-attend-marks">0% Marks</span>
+                  </div>
+                </div>
+                <div class="p-label" data-i18n>Best In Attendance</div>
+              </div>
+
+              <!-- Most Improved in Marks -->
+              <div class="performer-mini-card">
+                <div class="p-avatar">🧑‍🎓</div>
+                <div class="p-info">
+                  <div class="p-header">
+                    <span class="p-score" id="pm-imp-marks-val">0%</span>
+                    <span class="p-name" id="pm-imp-marks-name">Name</span>
+                  </div>
+                  <div class="p-meta" style="margin-top:4px;">
+                    <span class="p-badge" id="pm-imp-marks-grade">G8</span>
+                    <span class="p-badge">GPA 3</span>
+                    <span class="p-badge" id="pm-imp-marks-attend">0% Attend</span>
+                  </div>
+                </div>
+                <div class="p-label" data-i18n>Most Improved In Marks</div>
+              </div>
+
+              <!-- Most Improved in Attendance -->
+              <div class="performer-mini-card">
+                <div class="p-avatar">👩‍🎓</div>
+                <div class="p-info">
+                  <div class="p-header">
+                    <span class="p-score" id="pm-imp-attend-val">0%</span>
+                    <span class="p-name" id="pm-imp-attend-name">Name</span>
+                  </div>
+                  <div class="p-meta" style="margin-top:4px;">
+                    <span class="p-badge" id="pm-imp-attend-grade">G9</span>
+                    <span class="p-badge">GPA 5</span>
+                    <span class="p-badge" id="pm-imp-attend-marks">0% Marks</span>
+                  </div>
+                </div>
+                <div class="p-label" data-i18n>Most Improved In Attendance</div>
+              </div>
             </div>
-            <!-- Focus & Gaze Analytics -->
-            <div class="dash-card">
-              <h3 class="dash-title">🧠 <span data-i18n>Student Focus & Engagement</span></h3>
-              <div id="t-focus-metrics" class="dash-list"></div>
+          </div>
+        </div>
+
+        <!-- Bottom Grid: Examination Results & Details -->
+        <div class="teacher-dashboard-row">
+          <!-- Examination Results Bar Chart -->
+          <div class="teacher-card col-7">
+            <div class="card-header-actions">
+              <h3 class="teacher-card-title" data-i18n>Examination Results</h3>
+              <div class="card-actions">
+                <span class="action-tag">Grade ⇅</span>
+                <span class="action-tag">Gender 👤</span>
+              </div>
             </div>
-            <!-- Recent Submissions -->
-            <div class="dash-card">
-              <h3 class="dash-title">📥 <span data-i18n>Recent Quiz Submissions</span></h3>
-              <div id="t-recent-submissions" class="dash-list"></div>
+            <div class="bar-chart-container" style="position:relative; height:280px; width:100%;">
+              <canvas id="td-bar-chart"></canvas>
+            </div>
+          </div>
+
+          <!-- Student Details & Subject Gauges -->
+          <div class="teacher-card col-5" style="display:flex; flex-direction:column;">
+            <!-- Student Details Grid -->
+            <div class="student-details-header">
+              <h3 class="teacher-card-title" data-i18n>Student Details</h3>
+              <div class="card-actions">
+                <span class="action-tag" id="sd-grade-badge">All Grades</span>
+              </div>
+            </div>
+            <div class="student-details-list" id="td-student-details-list">
+              <!-- Dynamically populated student cards -->
+            </div>
+
+            <hr class="card-divider" />
+
+            <!-- Average Score Gauges -->
+            <div class="student-details-header" style="margin-top: 10px;">
+              <h3 class="teacher-card-title" data-i18n>Average Score</h3>
+              <div class="card-actions">
+                <span class="action-icon">⇅</span>
+              </div>
+            </div>
+            <div class="gauge-metrics-row" id="td-gauges-row">
+              <!-- Radial Gauges dynamically rendered -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Group Challenges & Creation Section -->
+        <div class="teacher-dashboard-row" style="margin-top:10px;">
+          <div class="teacher-card col-12" style="border-left:4px solid var(--purple)">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px; width:100%;">
+              <h3 class="teacher-card-title" style="margin:0;">👥 <span data-i18n>Study Group Challenges</span></h3>
+              <button class="btn-primary" onclick="openCreateChallengeModal()" style="padding:8px 16px; font-size:0.8rem; margin:0;"><span data-i18n>+ Create Challenge</span></button>
+            </div>
+            <div id="t-challenges-list" class="dash-list">
+              <div class="empty-state">Loading challenges...</div>
             </div>
           </div>
         </div>
@@ -421,103 +585,152 @@
       </div>
 
       <div id="screen-home" class="inner-screen active">
-        <!-- Dashboard Header -->
-        <div class="home-header">
-          <div class="greeting-box">
-            <h2 id="home-greeting">Good Morning! 🌅</h2>
-            <p id="home-username">Welcome back, Arjun!</p>
-          </div>
-          <!-- Smart Focus Mode Toggle -->
-          <div class="smart-focus-toggle-wrap" title="Smart Focus Mode: AI watches your expressions to personalise difficulty">
-            <div class="smart-focus-toggle-label">
-              <span class="sf-icon">🧠</span>
-              <span class="sf-text">Focus AI</span>
-            </div>
-            <label class="sf-switch" id="smart-focus-switch-label">
-              <input type="checkbox" id="smart-focus-toggle" onchange="onSmartFocusToggle(this.checked)">
-              <span class="sf-slider"></span>
-            </label>
-          </div>
-          <div class="daily-streak-box">
-            <div class="streak-fire">🔥</div>
-            <div class="streak-count"><span id="home-streak">0</span></div>
-            <div class="streak-label" data-i18n>Day Streak</div>
-          </div>
-        </div>
-
-        <!-- Level & XP Bar -->
-        <div class="xp-bar-section">
-          <div class="xp-bar-label">
-            <span>Level <span id="home-level">1</span></span>
-            <span><span id="home-xp">0</span> / <span id="home-xp-next">200</span> XP</span>
-          </div>
-          <div class="xp-bar-track"><div class="xp-bar-fill" id="xp-bar"></div></div>
-        </div>
-
-        <!-- Dashboard Grid Layout -->
-        <div class="dashboard-grid">
-          <!-- Left Column -->
-          <div class="dash-col">
-            <div class="dash-card battle-dash-card" style="border-left: 4px solid var(--primary); background: linear-gradient(135deg, rgba(255, 107, 53, 0.08), rgba(123, 104, 238, 0.08));">
-              <h3 class="dash-title" style="color: var(--primary);">⚔️ <span data-i18n>Live Quiz Battle</span></h3>
-              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;" data-i18n>Challenge your classmates to a real-time STEM quiz battle and earn 2x XP!</p>
-              <button class="btn-primary" onclick="showScreen('quiz-battle-lobby')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span data-i18n>Challenge a Friend</span> ⚔️
-              </button>
-            </div>
-
-            <!-- COLLABORATIVE GROUP CHALLENGES CARD -->
-            <div class="dash-card group-dash-card" style="border-left: 4px solid var(--purple); background: linear-gradient(135deg, rgba(123, 104, 238, 0.08), rgba(64, 224, 208, 0.08));">
-              <h3 class="dash-title" style="color: var(--purple);">👥 <span data-i18n>Study Groups & Challenges</span></h3>
-              <p style="font-size: 0.85rem; color: var(--text2); margin-bottom: 12px; line-height: 1.4;" data-i18n>Form study groups, complete lessons together, and earn shared badges displayed on all members' profiles!</p>
-              <button class="btn-primary" onclick="showScreen('groups')" style="width: 100%; margin-top: 4px; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                <span data-i18n>Join Study Group</span> 👥
-              </button>
-            </div>
-
-            <div class="dash-card">
-              <h3 class="dash-title">📊 <span data-i18n>Weekly XP Progress</span></h3>
-              <div class="chart-container">
-                <canvas id="weeklyXpChart"></canvas>
+        <!-- Main Two-Column Row -->
+        <div class="student-dashboard-container">
+          <!-- Left Column (Main Content) -->
+          <div class="student-main-col">
+            <!-- Welcome Banner Card -->
+            <div class="student-welcome-banner">
+              <div class="banner-text-content">
+                <h2 class="banner-title"><span data-i18n>Welcome back</span>, <span id="banner-student-name">Arjun</span>! 👋</h2>
+                <p class="banner-subtitle"><span data-i18n>You have successfully completed about</span> <strong id="banner-completion-val">60%</strong> <span data-i18n>of your studies.. Keep it up!</span></p>
+              </div>
+              <div class="banner-graphic-wrap">
+                <!-- Premium SVG Illustration representing learning -->
+                <svg viewBox="0 0 200 160" width="100%" height="100%" class="banner-svg">
+                  <defs>
+                    <linearGradient id="grad-cap" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stop-color="#4F46E5" />
+                      <stop offset="100%" stop-color="#818CF8" />
+                    </linearGradient>
+                  </defs>
+                  <!-- Stacked Books -->
+                  <rect x="30" y="110" width="140" height="24" rx="4" fill="#3B82F6" />
+                  <rect x="30" y="114" width="140" height="4" fill="#1D4ED8" />
+                  <rect x="40" y="90" width="120" height="20" rx="4" fill="#10B981" />
+                  <rect x="40" y="94" width="120" height="4" fill="#047857" />
+                  <!-- Graduation Cap -->
+                  <polygon points="100,30 150,50 100,70 50,50" fill="url(#grad-cap)" />
+                  <polygon points="50,50 50,60 100,80 150,60 150,50" fill="#3730A3" />
+                  <rect x="85" y="70" width="30" height="24" rx="2" fill="#312E81" />
+                  <!-- Tassel -->
+                  <path d="M100,50 L65,65 L65,80" fill="none" stroke="#F59E0B" stroke-width="3" stroke-linecap="round" />
+                  <circle cx="65" cy="80" r="4" fill="#D97706" />
+                </svg>
               </div>
             </div>
 
-            <div class="dash-card">
-              <h3 class="dash-title">📖 <span data-i18n>Continue Learning</span></h3>
-              <div id="home-subjects" class="subjects-grid-home"></div>
+            <!-- Two-Column Row for Homework & Studying Hours -->
+            <div class="student-stats-row">
+              <!-- Homework Progress Card -->
+              <div class="student-card col-half">
+                <div class="card-header-actions">
+                  <h3 class="student-card-title" data-i18n>Homework</h3>
+                  <button class="btn-text-action" onclick="showScreen('subjects')" data-i18n>View all</button>
+                </div>
+                <div class="homework-progress-list" id="sd-homework-list">
+                  <!-- Dynamically populated subjects progress -->
+                </div>
+              </div>
+
+              <!-- Studying Hours Card -->
+              <div class="student-card col-half" style="display:flex; align-items:center;">
+                <div class="card-header-actions" style="width:100%">
+                  <h3 class="student-card-title" data-i18n>Studying Hours</h3>
+                  <span class="badge-time-today" data-i18n>Today</span>
+                </div>
+                <div class="studying-radial-container">
+                  <div class="radial-progress-ring" id="sd-focus-ring" style="--pct: 67">
+                    <div class="radial-ring-inner">
+                      <span class="radial-ring-val" id="sd-focus-val">67%</span>
+                    </div>
+                  </div>
+                  <div class="radial-legend">
+                    <div class="rad-legend-item">
+                      <span class="rad-dot yellow"></span> <span data-i18n>Progress</span>
+                    </div>
+                    <div class="rad-legend-item">
+                      <span class="rad-dot blue"></span> <span data-i18n>Done</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div class="dash-card">
-              <h3 class="dash-title">🌟 <span data-i18n>Did You Know?</span></h3>
-              <div id="fun-fact-card" class="fun-fact-card">
-                <div class="fun-fact-icon">💡</div>
-                <div id="fun-fact-text" class="fun-fact-text">Loading...</div>
+            <!-- My Schedule Card -->
+            <div class="student-card">
+              <div class="card-header-actions">
+                <h3 class="student-card-title" data-i18n>My Schedule</h3>
+                <button class="btn-text-action" onclick="showScreen('subjects')" data-i18n>View all</button>
+              </div>
+              <div class="schedule-items-list" id="sd-schedule-list">
+                <!-- Dynamically populated schedule items -->
               </div>
             </div>
           </div>
 
-          <!-- Right Column -->
-          <div class="dash-col">
-            <div class="dash-card">
-              <h3 class="dash-title">📅 <span data-i18n>Upcoming Tasks</span></h3>
-              <div id="dash-upcoming-tasks" class="dash-list">
-                <div class="empty-state">Loading tasks...</div>
+          <!-- Right Column (Sidebar Widgets) -->
+          <div class="student-side-col">
+            <!-- Student Header Profile Widget -->
+            <div class="student-profile-widget">
+              <div class="widget-avatar-wrap">🧑‍🎓</div>
+              <div class="widget-profile-info">
+                <h4 id="sd-profile-name">John Mathew</h4>
+                <p id="sd-profile-email">John_Mathew@gmail.com</p>
               </div>
             </div>
 
-            <div class="dash-card">
-              <h3 class="dash-title">🕒 <span data-i18n>Recent Activity</span></h3>
-              <div id="dash-recent-activity" class="dash-list">
-                 <div class="empty-state">Loading activity...</div>
+            <!-- Calendar Card -->
+            <div class="student-card calendar-card-widget">
+              <div class="calendar-header">
+                <span class="cal-title" data-i18n>Calendar</span>
+                <span class="cal-month" id="sd-calendar-month">September 21</span>
+              </div>
+              <div class="calendar-days-grid" id="sd-calendar-days">
+                <!-- Calendar days generated in app.js -->
               </div>
             </div>
 
-            <div class="dash-card">
-              <h3 class="dash-title">🎖️ <span data-i18n>Badges Showcase</span></h3>
-              <div id="dash-badges" class="dash-badges-grid">
-                 <div class="empty-state">Loading badges...</div>
+            <!-- My Documents Card -->
+            <div class="student-card">
+              <div class="card-header-actions">
+                <h3 class="student-card-title" data-i18n>My Documents</h3>
+                <span class="action-dots" style="font-weight:bold; cursor:pointer;">•••</span>
               </div>
-              <button class="btn-text-small" onclick="showScreen('badges')"><span data-i18n>View All Badges</span> →</button>
+              <div class="documents-items-list">
+                <a href="#" class="document-item">
+                  <div class="doc-icon ppt">P</div>
+                  <div class="doc-info">
+                    <span class="doc-name">Syllabus_STEM.ppt</span>
+                    <span class="doc-date">02 Sept 2026</span>
+                  </div>
+                </a>
+                <a href="#" class="document-item">
+                  <div class="doc-icon doc">W</div>
+                  <div class="doc-info">
+                    <span class="doc-name">Formula_Sheet.docx</span>
+                    <span class="doc-date">12 Sept 2026</span>
+                  </div>
+                </a>
+                <a href="#" class="document-item">
+                  <div class="doc-icon xls">X</div>
+                  <div class="doc-info">
+                    <span class="doc-name">Focus_Timetable.xlsx</span>
+                    <span class="doc-date">21 Sept 2026</span>
+                  </div>
+                </a>
+              </div>
+            </div>
+
+            <!-- Teachers' Feedbacks Card -->
+            <div class="student-card">
+              <div class="card-header-actions">
+                <h3 class="student-card-title" data-i18n>Teachers' Feedbacks</h3>
+                <button class="btn-text-action" data-i18n>View all</button>
+              </div>
+              <div class="feedbacks-items-list" id="sd-feedbacks-list">
+                <!-- Dynamically populated feedbacks -->
+              </div>
             </div>
           </div>
         </div>
@@ -532,31 +745,29 @@
 
       <!-- SUBJECT OPTIONS (LEARNING MODES) -->
       <div id="screen-subject-options" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('subjects')">← Back / पीछे</button>
+        <button class="back-btn" onclick="showScreen('subjects')" data-i18n>← Back</button>
         <div id="subject-options-header" class="lessons-header">
           <!-- Dynamically filled header -->
         </div>
         <div class="subject-mode-grid">
           <div class="mode-card" onclick="selectLearningMode('lessons')" id="mode-card-lessons">
             <div class="mode-card-icon">📖</div>
-            <div class="mode-card-title">Video-Text Learning</div>
-            <div class="mode-card-title-hi">वीडियो-टेक्स्ट लर्निंग</div>
-            <div class="mode-card-desc">Study concepts step-by-step with translated text, speech narration, and chapter quizzes.</div>
-            <button class="btn-primary" style="margin-top:auto;">Start Learning 📚</button>
+            <div class="mode-card-title" data-i18n>Video-Text Learning</div>
+            <div class="mode-card-desc" data-i18n>Study concepts step-by-step with translated text, speech narration, and chapter quizzes.</div>
+            <button class="btn-primary" style="margin-top:auto;" data-i18n>Start Learning 📚</button>
           </div>
           <div class="mode-card" onclick="selectLearningMode('games')" id="mode-card-games">
             <div class="mode-card-icon">🎮</div>
-            <div class="mode-card-title">Gamified Learning</div>
-            <div class="mode-card-title-hi">गेमीफाइड लर्निंग</div>
-            <div class="mode-card-desc">Play interactive mini-games and solve puzzles matching your subject to earn bonus XP.</div>
-            <button class="btn-primary" style="margin-top:auto; background:linear-gradient(135deg, var(--secondary), #4ade80);">Play Games 🕹️</button>
+            <div class="mode-card-title" data-i18n>Gamified Learning</div>
+            <div class="mode-card-desc" data-i18n>Play interactive mini-games and solve puzzles matching your subject to earn bonus XP.</div>
+            <button class="btn-primary" style="margin-top:auto; background:linear-gradient(135deg, var(--secondary), #4ade80);" data-i18n>Play Games 🕹️</button>
           </div>
         </div>
       </div>
 
       <!-- SUBJECT GAMES MENU -->
       <div id="screen-subject-games" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('subject-options')">← Back / पीछे</button>
+        <button class="back-btn" onclick="showScreen('subject-options')" data-i18n>← Back</button>
         <div id="subject-games-header" class="lessons-header">
           <!-- Dynamically filled header -->
         </div>
@@ -567,7 +778,7 @@
 
       <!-- LESSONS LIST -->
       <div id="screen-lessons" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('subject-options')">← Back / पीछे</button>
+        <button class="back-btn" onclick="showScreen('subject-options')" data-i18n>← Back</button>
         <div id="lessons-header" class="lessons-header"></div>
         <div id="lessons-list" class="lessons-list"></div>
       </div>
@@ -640,7 +851,7 @@
 
       <!-- QUIZ BATTLE LOBBY -->
       <div id="screen-quiz-battle-lobby" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('home')">← Back / पीछे</button>
+        <button class="back-btn" onclick="showScreen('home')" data-i18n>← Back</button>
         <h2 class="screen-title">⚔️ Quiz Battle Arena / क्विज़ बैटल</h2>
         <p class="screen-subtitle">Challenge classmates in real-time quiz duels / क्लासमेट्स को लाइव चुनौती दें!</p>
         
@@ -775,7 +986,7 @@
 
       <!-- COLLABORATIVE STUDY GROUPS SCREEN -->
       <div id="screen-groups" class="inner-screen">
-        <button class="back-btn" onclick="showScreen('home')">← Back to Home / पीछे</button>
+        <button class="back-btn" onclick="showScreen('home')" data-i18n>← Back to Home</button>
         
         <!-- Not in Group view -->
         <div id="group-non-member-view" class="hidden">
@@ -872,6 +1083,87 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- VIRTUAL LABS SCREEN -->
+      <div id="screen-labs" class="inner-screen">
+        <button class="back-btn" onclick="showScreen('home')" data-i18n>← Back to Dashboard</button>
+        <div class="labs-header-banner">
+          <div class="labs-banner-content">
+            <span class="labs-banner-emoji">🧪</span>
+            <div>
+              <h2 class="labs-banner-title">STEM Virtual Lab</h2>
+              <p class="labs-banner-subtitle">Interactive visual simulations to discover, learn, and experiment</p>
+            </div>
+          </div>
+        </div>
+
+        <div id="labs-categories-grid" class="labs-categories-grid">
+          <!-- Physics -->
+          <div class="lab-category-card physics" onclick="selectLabCategory('physics')">
+            <div class="lab-cat-glow"></div>
+            <div class="lab-cat-icon-wrap">⚛️</div>
+            <h3 class="lab-cat-name">Physics Lab</h3>
+            <p class="lab-cat-desc">Explore forces, projectile motion, density, Faraday's electromagnetism, and light refraction.</p>
+            <div class="lab-cat-count">12 Simulations</div>
+            <button class="lab-cat-btn">Open Physics Lab ➔</button>
+          </div>
+
+          <!-- Chemistry -->
+          <div class="lab-category-card chemistry" onclick="selectLabCategory('chemistry')">
+            <div class="lab-cat-glow"></div>
+            <div class="lab-cat-icon-wrap">🧪</div>
+            <h3 class="lab-cat-name">Chemistry Lab</h3>
+            <p class="lab-cat-desc">Build atoms/molecules, balance chemical equations, analyze pH scales, and run scattering experiments.</p>
+            <div class="lab-cat-count">7 Simulations</div>
+            <button class="lab-cat-btn">Open Chemistry Lab ➔</button>
+          </div>
+
+          <!-- Mathematics -->
+          <div class="lab-category-card maths" onclick="selectLabCategory('maths')">
+            <div class="lab-cat-glow"></div>
+            <div class="lab-cat-icon-wrap">🔢</div>
+            <h3 class="lab-cat-name">Mathematics Lab</h3>
+            <p class="lab-cat-desc">Model algebraic areas, visualize fractions, experiment with Plinko probability, and tour unit circles.</p>
+            <div class="lab-cat-count">9 Simulations</div>
+            <button class="lab-cat-btn">Open Math Lab ➔</button>
+          </div>
+
+          <!-- Biology -->
+          <div class="lab-category-card biology" onclick="selectLabCategory('biology')">
+            <div class="lab-cat-glow"></div>
+            <div class="lab-cat-icon-wrap">🧬</div>
+            <h3 class="lab-cat-name">Biology Lab</h3>
+            <p class="lab-cat-desc">Study gene expression mechanics, membrane diffusion/transport, and natural selection dynamics.</p>
+            <div class="lab-cat-count">3 Simulations</div>
+            <button class="lab-cat-btn">Open Biology Lab ➔</button>
+          </div>
+        </div>
+
+        <!-- DYNAMIC SIMULATION LIST (Initially hidden) -->
+        <div id="labs-list-section" class="labs-list-section hidden">
+          <div class="labs-list-header">
+            <button class="btn-text-back" onclick="hideLabsList()">⮌ Back to Categories</button>
+            <h3 id="selected-lab-title" class="labs-list-title">Physics Simulations</h3>
+          </div>
+          <div id="labs-grid" class="labs-grid-container">
+            <!-- Loaded dynamically in app.js -->
+          </div>
+        </div>
+      </div>
+
+      <!-- SIMULATION VIEWER SCREEN -->
+      <div id="screen-lab-viewer" class="inner-screen">
+        <div class="lab-viewer-nav">
+          <button class="back-btn" onclick="goBackToLabsList()" style="margin:0;" data-i18n>← Back to Labs</button>
+          <h3 id="lab-viewer-title" class="lab-viewer-title">Simulation</h3>
+          <button class="btn-primary" onclick="toggleFullScreenLab()" id="btn-fullscreen-lab" style="margin:0; padding:8px 16px; font-size:0.85rem; font-family:'Baloo 2', cursive; display:flex; align-items:center; gap:6px;">
+            <span>⛶</span> Fullscreen
+          </button>
+        </div>
+        <div class="lab-iframe-wrapper">
+          <iframe id="lab-iframe" src="" allowfullscreen></iframe>
         </div>
       </div>
 

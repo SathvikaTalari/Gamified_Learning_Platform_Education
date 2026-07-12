@@ -1,0 +1,858 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BioSphere - Virtual Biology Laboratory</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        /* Custom Scrollbar for modern feel */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        /* Organelle Hover Styling */
+        .organelle {
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+        }
+
+        .organelle:hover {
+            filter: brightness(1.3) drop-shadow(0 0 4px var(--accent-color, #38bdf8));
+        }
+
+        /* Animation pulse for water flow indicators */
+        @keyframes pulse-flow {
+
+            0%,
+            100% {
+                opacity: 0.3;
+                transform: scale(0.95);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.05);
+            }
+        }
+
+        .flow-arrow {
+            animation: pulse-flow 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col md:flex-row overflow-hidden">
+
+    <!-- APP WRAPPER -->
+    <div class="flex flex-col md:flex-row w-full h-screen overflow-hidden">
+
+        <!-- SIDEBAR NAVIGATION -->
+        <aside
+            class="w-full md:w-64 bg-slate-900 border-b md:border-b-0 md:border-r border-slate-800 flex flex-col justify-between p-6 shrink-0">
+            <div>
+                <!-- Logo & Header -->
+                <div class="flex items-center gap-3 mb-8">
+                    <div class="p-2.5 bg-emerald-500/10 text-emerald-400 rounded-xl border border-emerald-500/20">
+                        <i data-lucide="microscope" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="font-bold text-lg leading-none tracking-tight text-white">BioSphere</h1>
+                        <span class="text-xs text-slate-400 font-medium">Virtual Science Lab</span>
+                    </div>
+                </div>
+
+                <!-- Navigation Buttons -->
+                <nav class="space-y-1.5">
+                    <button
+                        class="nav-tab-btn active w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition bg-slate-800 text-white border-l-4 border-emerald-500"
+                        data-target="microscope-lab">
+                        <i data-lucide="eye" class="w-4 h-4 text-emerald-400"></i>
+                        Microscopy Station
+                    </button>
+                    <button
+                        class="nav-tab-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition text-slate-400 hover:text-slate-100 hover:bg-slate-800/50"
+                        data-target="osmosis-lab">
+                        <i data-lucide="droplet" class="w-4 h-4 text-sky-400"></i>
+                        Osmosis & Tonicity
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Footer & Instructions -->
+            <div class="mt-6 pt-6 border-t border-slate-800 text-xs text-slate-500">
+                <div class="flex items-center gap-2 mb-2 text-emerald-400 font-medium">
+                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    System Status: Operational
+                </div>
+                <p>Interactive biological components scale automatically based on parameters.</p>
+            </div>
+        </aside>
+
+        <!-- MAIN LAB WORKSPACE -->
+        <main class="flex-1 flex flex-col min-h-0 bg-slate-950 overflow-y-auto">
+
+            <!-- SCREEN 1: MICROSCOPE LAB -->
+            <section id="microscope-lab" class="lab-screen flex-1 flex flex-col p-6 space-y-6">
+
+                <!-- Header -->
+                <div
+                    class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                    <div>
+                        <span class="text-xs font-semibold tracking-wider uppercase text-emerald-400">Experiment Block
+                            01</span>
+                        <h2 class="text-2xl font-bold text-white mt-1">High-Fidelity Microscopy Workstation</h2>
+                        <p class="text-sm text-slate-400 mt-1">Adjust lens parameters, lighting iris, and focus depth to
+                            examine cellular structures. Hover/Click organs to identify.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span
+                            class="px-3 py-1 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full text-xs font-medium flex items-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> SVG Vector Engine
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Workspace Split Layout -->
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start flex-1 min-h-0">
+
+                    <!-- Control Panel (Left Column) -->
+                    <div class="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-5 shadow-xl">
+                        <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                            <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i>
+                            <h3 class="font-bold text-white">Hardware Adjustments</h3>
+                        </div>
+
+                        <!-- Sample Selector -->
+                        <div class="space-y-2">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Select
+                                Sample Slide</label>
+                            <div class="grid grid-cols-2 gap-2">
+                                <button id="btn-sample-animal"
+                                    class="sample-btn px-4 py-3 rounded-xl border border-emerald-500 bg-emerald-500/10 text-emerald-400 text-sm font-semibold transition flex items-center justify-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-rose-500"></span> Animal Epithelial
+                                </button>
+                                <button id="btn-sample-plant"
+                                    class="sample-btn px-4 py-3 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 text-sm font-semibold transition hover:bg-slate-800 flex items-center justify-center gap-2">
+                                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span> Plant Epidermal
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Objective Lens Zoom -->
+                        <div class="space-y-2 bg-slate-950/50 p-4 rounded-xl border border-slate-800/50">
+                            <div class="flex justify-between items-center text-sm">
+                                <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Objective
+                                    Lens (Magnification)</label>
+                                <span id="lbl-zoom" class="text-emerald-400 font-bold font-mono">10x</span>
+                            </div>
+                            <input type="range" id="slider-zoom" min="1" max="4" step="0.05" value="1"
+                                class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                            <div class="flex justify-between text-[10px] text-slate-500">
+                                <span>10x (Low)</span>
+                                <span>20x (Med)</span>
+                                <span>40x (High)</span>
+                            </div>
+                        </div>
+
+                        <!-- Focus Stage -->
+                        <div class="space-y-2 bg-slate-950/50 p-4 rounded-xl border border-slate-800/50">
+                            <div class="flex justify-between items-center text-sm">
+                                <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Coarse /
+                                    Fine Focus</label>
+                                <span id="lbl-focus" class="text-rose-500 font-bold font-mono">Blurry</span>
+                            </div>
+                            <input type="range" id="slider-focus" min="0" max="10" step="0.1" value="2.5"
+                                class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                            <div class="flex justify-between text-[10px] text-slate-500">
+                                <span>Under-focused</span>
+                                <span>Optimum Focal Point</span>
+                                <span>Over-focused</span>
+                            </div>
+                        </div>
+
+                        <!-- Substage Illuminator -->
+                        <div class="space-y-2 bg-slate-950/50 p-4 rounded-xl border border-slate-800/50">
+                            <div class="flex justify-between items-center text-sm">
+                                <label class="text-xs font-semibold uppercase tracking-wider text-slate-400">Illuminator
+                                    Iris (Brightness)</label>
+                                <span id="lbl-light" class="text-amber-400 font-bold font-mono">50%</span>
+                            </div>
+                            <input type="range" id="slider-light" min="10" max="100" value="50"
+                                class="w-full h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-emerald-500">
+                        </div>
+
+                    </div>
+
+                    <!-- Eyepiece Panel (Right Column) -->
+                    <div class="xl:col-span-7 flex flex-col space-y-4">
+
+                        <!-- Microscope Viewport -->
+                        <div
+                            class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center shadow-xl min-h-[420px] relative overflow-hidden">
+                            <span
+                                class="absolute top-4 left-4 text-xs font-semibold text-slate-500 tracking-wider uppercase">Stage
+                                Eyepiece View</span>
+
+                            <!-- Circular Lens Chassis -->
+                            <div
+                                class="relative w-[340px] h-[340px] md:w-[380px] md:h-[380px] rounded-full border-[16px] border-slate-800 bg-black overflow-hidden shadow-[inset_0_0_40px_rgba(0,0,0,0.9),0_10px_25px_rgba(0,0,0,0.5)] flex items-center justify-center">
+
+                                <!-- Optics Stage Grid Overlay (moves with slide) -->
+                                <div id="eyepiece-stage"
+                                    class="w-full h-full flex items-center justify-center transition-transform duration-100 ease-out">
+
+                                    <!-- ANIMAL CELL MODEL SVG -->
+                                    <svg id="svg-animal" class="w-[85%] h-[85%] select-none" viewBox="0 0 200 200"
+                                        style="--accent-color: #f43f5e;">
+                                        <!-- Cytoplasm & Membrane -->
+                                        <path class="organelle" data-name="Cell Membrane & Cytoplasm"
+                                            data-desc="The outer fluid boundary regulating molecular entry and containing internal metabolic proteins."
+                                            d="M25,100 C20,45 55,25 105,25 C165,25 180,60 180,105 C180,155 140,175 105,175 C45,175 30,155 25,100 Z"
+                                            fill="rgba(244, 63, 94, 0.15)" stroke="#f43f5e" stroke-width="2.5" />
+
+                                        <!-- Mitochondrion 1 -->
+                                        <g class="organelle" data-name="Mitochondrion"
+                                            data-desc="The powerhouse of the cell, generating metabolic ATP energy through cellular aerobic respiration."
+                                            transform="translate(130, 65) rotate(40)">
+                                            <rect x="0" y="0" width="16" height="28" rx="8" fill="#ea580c"
+                                                stroke="#f97316" stroke-width="1" />
+                                            <path d="M2,6 L14,10 L2,14 L14,18 L2,22" fill="none" stroke="#ffedd5"
+                                                stroke-width="1.5" stroke-linecap="round" />
+                                        </g>
+                                        <!-- Mitochondrion 2 -->
+                                        <g class="organelle" data-name="Mitochondrion"
+                                            data-desc="The powerhouse of the cell, generating metabolic ATP energy through cellular aerobic respiration."
+                                            transform="translate(45, 125) rotate(-35)">
+                                            <rect x="0" y="0" width="16" height="28" rx="8" fill="#ea580c"
+                                                stroke="#f97316" stroke-width="1" />
+                                            <path d="M2,6 L14,10 L2,14 L14,18 L2,22" fill="none" stroke="#ffedd5"
+                                                stroke-width="1.5" stroke-linecap="round" />
+                                        </g>
+
+                                        <!-- Rough Endoplasmic Reticulum (folds surrounding nucleus) -->
+                                        <g class="organelle" data-name="Rough Endoplasmic Reticulum (RER)"
+                                            data-desc="Interconnected fluid-filled sacs studded with ribosomes, translating and folding complex polypeptide chains.">
+                                            <path
+                                                d="M60,110 C50,100 50,85 62,75 C75,65 110,65 125,73 C138,82 142,102 135,115"
+                                                fill="none" stroke="#a855f7" stroke-width="5" stroke-linecap="round"
+                                                opacity="0.8" />
+                                            <path
+                                                d="M52,112 C40,95 42,75 56,65 C72,53 115,53 133,63 C149,75 152,102 143,120"
+                                                fill="none" stroke="#c084fc" stroke-width="3" stroke-linecap="round"
+                                                opacity="0.6" />
+                                        </g>
+
+                                        <!-- Ribosomes (Studded on RER & free floating) -->
+                                        <g class="organelle" data-name="Ribosomes"
+                                            data-desc="Tiny complexes of RNA and proteins. They translate genetic messenger templates into functional protein chains.">
+                                            <circle cx="58" cy="85" r="1.5" fill="#e9d5ff" />
+                                            <circle cx="68" cy="74" r="1.5" fill="#e9d5ff" />
+                                            <circle cx="85" cy="67" r="1.5" fill="#e9d5ff" />
+                                            <circle cx="110" cy="69" r="1.5" fill="#e9d5ff" />
+                                            <circle cx="126" cy="80" r="1.5" fill="#e9d5ff" />
+                                            <!-- Free floating ribosomes -->
+                                            <circle cx="120" cy="140" r="1.5" fill="#a5f3fc" />
+                                            <circle cx="75" cy="145" r="1.5" fill="#a5f3fc" />
+                                            <circle cx="145" cy="115" r="1.5" fill="#a5f3fc" />
+                                        </g>
+
+                                        <!-- Nucleus & Nucleolus Assembly -->
+                                        <g class="organelle" data-name="Nucleus & Nucleolus"
+                                            data-desc="The central vault housing chromatin genetic DNA templates; the inner core coordinates active ribosomal assembly.">
+                                            <!-- Outer Nucleus membrane -->
+                                            <circle cx="98" cy="100" r="23" fill="#be123c" stroke="#991b1b"
+                                                stroke-width="1.5" />
+                                            <!-- Inner Nucleolus -->
+                                            <circle cx="95" cy="95" r="9" fill="#4c0519" />
+                                            <!-- Chromatin lines inside -->
+                                            <path d="M85,108 Q90,110 93,105 T108,112" fill="none" stroke="#f43f5e"
+                                                stroke-width="1" opacity="0.7" />
+                                        </g>
+
+                                        <!-- Golgi Apparatus -->
+                                        <g class="organelle" data-name="Golgi Apparatus"
+                                            data-desc="Membranous vesicles that Sort, tag, packet, and ship synthesized lipids and proteins out of the cell."
+                                            transform="translate(100, 122) rotate(-5)">
+                                            <path d="M10,5 Q30,10 50,5" fill="none" stroke="#eab308" stroke-width="4.5"
+                                                stroke-linecap="round" />
+                                            <path d="M5,12 Q30,18 55,12" fill="none" stroke="#eab308" stroke-width="4.5"
+                                                stroke-linecap="round" />
+                                            <path d="M15,19 Q30,24 45,19" fill="none" stroke="#eab308"
+                                                stroke-width="4.5" stroke-linecap="round" />
+                                            <!-- Transport Vesicles leaving -->
+                                            <circle cx="2" cy="7" r="2" fill="#fef08a" />
+                                            <circle cx="58" cy="10" r="2.5" fill="#fef08a" />
+                                        </g>
+
+                                        <!-- Lysosome / Vacuole -->
+                                        <circle class="organelle" data-name="Lysosome"
+                                            data-desc="Spherical membrane containing acidic hydrolytic enzymes to metabolize and break down waste."
+                                            cx="140" cy="130" r="7" fill="#06b6d4" stroke="#0891b2" stroke-width="1" />
+                                        <circle class="organelle" data-name="Centrosome"
+                                            data-desc="An organizing center composed of microtubules, coordinating spindle networks during mitotic cell division."
+                                            cx="72" cy="120" r="4.5" fill="#14b8a6" stroke="#0d9488" stroke-width="1" />
+                                    </svg>
+
+                                    <!-- PLANT CELL MODEL SVG (hidden initially) -->
+                                    <svg id="svg-plant" class="w-[85%] h-[85%] select-none hidden" viewBox="0 0 200 200"
+                                        style="--accent-color: #22c55e;">
+                                        <!-- Outer Thick Cell Wall (Hexagonal box framework) -->
+                                        <polygon class="organelle" data-name="Cell Wall"
+                                            data-desc="A strong, rigid outer structural frame composed of dense cellulose microfibrils that maintains cell shape."
+                                            points="35,20 165,20 185,100 165,180 35,180 15,100" fill="none"
+                                            stroke="#166534" stroke-width="5" stroke-linejoin="round" />
+                                        <!-- Plasma Membrane (inner thin line) -->
+                                        <polygon class="organelle" data-name="Plasma Membrane"
+                                            data-desc="The semi-permeable membrane hugging the interior side of the cell wall, regulating flow of solutes."
+                                            points="38,24 162,24 181,100 162,176 38,176 19,100"
+                                            fill="rgba(34, 197, 94, 0.12)" stroke="#22c55e" stroke-width="1.5"
+                                            stroke-linejoin="round" />
+
+                                        <!-- Large Central Vacuole -->
+                                        <path class="organelle" data-name="Large Central Vacuole"
+                                            data-desc="A massive central reservoir filled with water and inorganic ions, producing critical turgor pressure to keep the plant rigid."
+                                            d="M65,50 Q105,38 145,55 T155,130 T100,162 T48,115 Z"
+                                            fill="rgba(14, 165, 233, 0.22)" stroke="#0ea5e9" stroke-width="2" />
+
+                                        <!-- Nucleus (Squeezed to the corner by vacuole) -->
+                                        <g class="organelle" data-name="Nucleus (Deflected)"
+                                            data-desc="Pushed to the cell periphery due to the expansion of the central vacuole, this organelle retains the master genetic templates.">
+                                            <circle cx="45" cy="140" r="18" fill="#be123c" stroke="#991b1b"
+                                                stroke-width="1.5" />
+                                            <circle cx="42" cy="138" r="7" fill="#4c0519" />
+                                            <path d="M38,145 Q42,148 48,144" fill="none" stroke="#f43f5e"
+                                                stroke-width="1" opacity="0.6" />
+                                        </g>
+
+                                        <!-- Chloroplast 1 -->
+                                        <g class="organelle" data-name="Chloroplast"
+                                            data-desc="The solar power center containing chlorophyll. Coordinates photosynthesis to convert sunlight into organic glucose sugar."
+                                            transform="translate(138, 30) rotate(15)">
+                                            <ellipse cx="14" cy="9" rx="14" ry="9" fill="#15803d" stroke="#4ade80"
+                                                stroke-width="1" />
+                                            <line x1="5" y1="6" x2="23" y2="6" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="9" x2="23" y2="9" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="12" x2="23" y2="12" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                        </g>
+                                        <!-- Chloroplast 2 -->
+                                        <g class="organelle" data-name="Chloroplast"
+                                            data-desc="The solar power center containing chlorophyll. Coordinates photosynthesis to convert sunlight into organic glucose sugar."
+                                            transform="translate(150, 135) rotate(-25)">
+                                            <ellipse cx="14" cy="9" rx="14" ry="9" fill="#15803d" stroke="#4ade80"
+                                                stroke-width="1" />
+                                            <line x1="5" y1="6" x2="23" y2="6" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="9" x2="23" y2="9" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="12" x2="23" y2="12" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                        </g>
+                                        <!-- Chloroplast 3 -->
+                                        <g class="organelle" data-name="Chloroplast"
+                                            data-desc="The solar power center containing chlorophyll. Coordinates photosynthesis to convert sunlight into organic glucose sugar."
+                                            transform="translate(30, 45) rotate(-55)">
+                                            <ellipse cx="14" cy="9" rx="14" ry="9" fill="#15803d" stroke="#4ade80"
+                                                stroke-width="1" />
+                                            <line x1="5" y1="6" x2="23" y2="6" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="9" x2="23" y2="9" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                            <line x1="5" y1="12" x2="23" y2="12" stroke="#22c55e" stroke-width="1.5"
+                                                stroke-linecap="round" />
+                                        </g>
+
+                                        <!-- Mitochondrion -->
+                                        <g class="organelle" data-name="Mitochondrion"
+                                            data-desc="Synthesizes chemical ATP energy structures. Slower count in plants than active animal biological tissue."
+                                            transform="translate(115, 140) rotate(60)">
+                                            <rect x="0" y="0" width="12" height="22" rx="6" fill="#ea580c"
+                                                stroke="#f97316" stroke-width="1" />
+                                            <path d="M2,4 L10,7 L2,10 L10,13 L2,16" fill="none" stroke="#ffedd5"
+                                                stroke-width="1" />
+                                        </g>
+                                    </svg>
+
+                                </div>
+                                <!-- Interactive Dark Light-Aperture Overlay -->
+                                <div id="light-lens-overlay"
+                                    class="absolute inset-0 bg-black/40 pointer-events-none transition-colors duration-200">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Organelle Identification Panel -->
+                        <div id="organelle-card"
+                            class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative min-h-[120px] flex flex-col justify-center">
+                            <div
+                                class="absolute top-4 right-4 text-[10px] uppercase font-bold text-slate-500 tracking-widest flex items-center gap-1">
+                                <i data-lucide="info" class="w-3.5 h-3.5"></i> Tooltip Sensor
+                            </div>
+                            <div id="organelle-placeholder" class="text-center text-slate-500 py-3">
+                                <p class="text-sm">Hover over or tap any structure in the microscope view to extract and
+                                    identify components.</p>
+                            </div>
+                            <div id="organelle-data" class="hidden space-y-1.5">
+                                <h4 id="organelle-title" class="text-lg font-bold text-emerald-400">Organelle Title</h4>
+                                <p id="organelle-description" class="text-sm text-slate-300 leading-relaxed">Description
+                                    explanation details.</p>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- SCREEN 2: OSMOSIS & TONICITY LAB -->
+            <section id="osmosis-lab" class="lab-screen flex-1 flex flex-col p-6 space-y-6 hidden">
+
+                <!-- Header -->
+                <div
+                    class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-5">
+                    <div>
+                        <span class="text-xs font-semibold tracking-wider uppercase text-sky-400">Experiment Block
+                            02</span>
+                        <h2 class="text-2xl font-bold text-white mt-1">Cellular Osmosis & Tonicity Station</h2>
+                        <p class="text-sm text-slate-400 mt-1">Examine physical water migration across semipermeable
+                            membranes inside various saline solutions.</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <span
+                            class="px-3 py-1 bg-sky-500/10 text-sky-400 border border-sky-500/20 rounded-full text-xs font-medium flex items-center gap-1.5">
+                            <i data-lucide="droplet" class="w-3.5 h-3.5 animate-bounce"></i> Real-time Aquaporin Physics
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Grid Workspace -->
+                <div class="grid grid-cols-1 xl:grid-cols-12 gap-6 items-start flex-1 min-h-0">
+
+                    <!-- Control Panel (Left Column) -->
+                    <div class="xl:col-span-5 bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-6 shadow-xl">
+                        <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                            <i data-lucide="test-tube-2" class="w-4 h-4 text-sky-400"></i>
+                            <h3 class="font-bold text-white">Solution Settings</h3>
+                        </div>
+
+                        <!-- Radio Selections -->
+                        <div class="space-y-3">
+                            <label class="block text-xs font-semibold uppercase tracking-wider text-slate-400">Select
+                                Beaker Environment</label>
+                            <div class="space-y-2.5">
+
+                                <!-- Pure Distilled Option -->
+                                <label
+                                    class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/40 cursor-pointer transition">
+                                    <input type="radio" name="solution" value="hypotonic" checked
+                                        class="mt-1 accent-sky-500">
+                                    <div>
+                                        <span class="font-bold text-white text-sm block">Distilled Pure Water <span
+                                                class="text-sky-400 text-xs font-medium bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20 ml-1">Hypotonic</span></span>
+                                        <span class="text-xs text-slate-400 block mt-0.5">Solute concentration is lower
+                                            than cell cytosol. Water flows inside.</span>
+                                    </div>
+                                </label>
+
+                                <!-- Isotonic Option -->
+                                <label
+                                    class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/40 cursor-pointer transition">
+                                    <input type="radio" name="solution" value="isotonic" class="mt-1 accent-sky-500">
+                                    <div>
+                                        <span class="font-bold text-white text-sm block">Physiological Saline (0.9%
+                                            NaCl) <span
+                                                class="text-emerald-400 text-xs font-medium bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20 ml-1">Isotonic</span></span>
+                                        <span class="text-xs text-slate-400 block mt-0.5">Perfect solute balance.
+                                            Dynamic water equilibrium.</span>
+                                    </div>
+                                </label>
+
+                                <!-- Hypertonic Option -->
+                                <label
+                                    class="flex items-start gap-3 p-4 rounded-xl border border-slate-800 bg-slate-950/40 hover:bg-slate-800/40 cursor-pointer transition">
+                                    <input type="radio" name="solution" value="hypertonic" class="mt-1 accent-sky-500">
+                                    <div>
+                                        <span class="font-bold text-white text-sm block">High Saline Solution (10% NaCl)
+                                            <span
+                                                class="text-amber-400 text-xs font-medium bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20 ml-1">Hypertonic</span></span>
+                                        <span class="text-xs text-slate-400 block mt-0.5">Solute concentration is
+                                            extremely high. Cellular water leaves.</span>
+                                    </div>
+                                </label>
+
+                            </div>
+                        </div>
+
+                        <button id="btn-inject-osmosis"
+                            class="w-full py-3.5 bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white rounded-xl font-bold transition shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2">
+                            <i data-lucide="flask-conical" class="w-4 h-4"></i> Trigger Molecular Flow
+                        </button>
+                    </div>
+
+                    <!-- Simulation Vessel Area (Right Column) -->
+                    <div class="xl:col-span-7 flex flex-col space-y-4">
+
+                        <!-- Beaker Rendering Container -->
+                        <div
+                            class="bg-slate-900 border border-slate-800 rounded-2xl p-6 flex flex-col items-center justify-center shadow-xl min-h-[420px] relative overflow-hidden">
+                            <span
+                                class="absolute top-4 left-4 text-xs font-semibold text-slate-500 tracking-wider uppercase">Beaker
+                                Reaction Vessel</span>
+
+                            <!-- The Beaker Body Structure -->
+                            <div
+                                class="relative w-[220px] h-[280px] border-[5px] border-slate-400 border-t-0 rounded-b-[24px] mt-8 flex items-center justify-center bg-slate-950/20">
+
+                                <!-- Fluid fill layer representing salt concentration visually -->
+                                <div id="beaker-liquid"
+                                    class="absolute bottom-0 left-0 right-0 h-[80%] bg-sky-600/20 border-t border-sky-400/40 transition-all duration-700 ease-in-out rounded-b-[18px]">
+                                </div>
+
+                                <!-- Osmosis Vector Red Blood Cell Rendering -->
+                                <div class="z-10 relative">
+                                    <!-- Red Blood Cell Vector representation -->
+                                    <svg id="svg-rbc" class="w-[100px] h-[100px] transition-all duration-1000 ease-out"
+                                        viewBox="0 0 100 100">
+                                        <!-- Dynamic pathway matching normal vs crenated look -->
+                                        <path id="rbc-membrane"
+                                            d="M50,15 C70,15 85,30 85,50 C85,70 70,85 50,85 C30,85 15,70 15,50 C15,30 30,15 50,15 Z"
+                                            fill="#b91c1c" stroke="#7f1d1d" stroke-width="3" />
+                                        <!-- Inner indented ring (Biconcave shape look) -->
+                                        <path id="rbc-dimple"
+                                            d="M50,30 C60,30 70,38 70,50 C70,62 60,70 50,70 C40,70 30,62 30,50 C30,38 40,30 50,30 Z"
+                                            fill="#991b1b" opacity="0.65" />
+                                    </svg>
+
+                                    <!-- Water flux arrows indicating aquaporin direction -->
+                                    <g class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                                        <!-- OUTWARD FLOW -->
+                                        <div id="flow-out"
+                                            class="absolute inset-0 flex items-center justify-center gap-12 hidden">
+                                            <i data-lucide="arrow-left"
+                                                class="flow-arrow w-6 h-6 text-sky-400 -translate-x-4"></i>
+                                            <i data-lucide="arrow-right"
+                                                class="flow-arrow w-6 h-6 text-sky-400 translate-x-4"></i>
+                                        </div>
+                                        <!-- INWARD FLOW -->
+                                        <div id="flow-in"
+                                            class="absolute inset-0 flex items-center justify-center gap-12">
+                                            <i data-lucide="arrow-right"
+                                                class="flow-arrow w-6 h-6 text-sky-300 -translate-x-6"></i>
+                                            <i data-lucide="arrow-left"
+                                                class="flow-arrow w-6 h-6 text-sky-300 translate-x-6"></i>
+                                        </div>
+                                    </g>
+                                </div>
+
+                                <!-- Measuring line indicators on Beaker side -->
+                                <div
+                                    class="absolute right-[-24px] top-12 flex flex-col items-start gap-5 text-[10px] text-slate-500 font-mono">
+                                    <span class="border-b border-slate-600 w-3">250ml</span>
+                                    <span class="border-b border-slate-600 w-3">200ml</span>
+                                    <span class="border-b border-slate-600 w-3">150ml</span>
+                                    <span class="border-b border-slate-600 w-3">100ml</span>
+                                </div>
+                            </div>
+
+                        </div>
+
+                    </div>
+
+                </div>
+            </section>
+
+            <!-- LAB WORKBOOK REAL-TIME LOG -->
+            <footer class="p-6 bg-slate-900 border-t border-slate-800 shadow-inner">
+                <div class="max-w-6xl mx-auto flex flex-col md:flex-row items-start gap-4">
+                    <div class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-emerald-400 shrink-0">
+                        <i data-lucide="book-open-check" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wider text-slate-400">Biological Observation
+                            Logbook</h3>
+                        <p id="analysis-log-text" class="text-sm text-slate-200 mt-1 leading-relaxed">
+                            Welcome to BioSphere Workstation. Switch between lab stations or adjust parameters on the
+                            left to display observations.
+                        </p>
+                    </div>
+                </div>
+            </footer>
+
+        </main>
+    </div>
+
+    <script>
+        // Initialize Icon Rendering
+        lucide.createIcons();
+
+        // SCREEN ROUTING
+        const navButtons = document.querySelectorAll('.nav-tab-btn');
+        const labScreens = document.querySelectorAll('.lab-screen');
+        const globalLog = document.getElementById('analysis-log-text');
+
+        navButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                // Toggle Sidebar Nav States
+                navButtons.forEach(b => {
+                    b.className = "nav-tab-btn w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition text-slate-400 hover:text-slate-100 hover:bg-slate-800/50";
+                    b.querySelector('i').classList.remove('text-emerald-400', 'text-sky-400');
+                });
+
+                btn.className = "nav-tab-btn active w-full flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-xl transition bg-slate-800 text-white border-l-4 border-emerald-500";
+                const icon = btn.querySelector('i');
+                const targetScreen = btn.getAttribute('data-target');
+
+                if (targetScreen === 'microscope-lab') {
+                    icon.classList.add('text-emerald-400');
+                    globalLog.textContent = "Viewing Station operational. Toggle sample slides or calibrate focal planes on the left.";
+                } else {
+                    icon.classList.add('text-sky-400');
+                    globalLog.textContent = "Osmotic Tonicity environment ready. Set surrounding saline concentrations to evaluate erythrocyte morphology.";
+                }
+
+                // Display Corresponding Screen
+                labScreens.forEach(screen => {
+                    if (screen.id === targetScreen) {
+                        screen.classList.remove('hidden');
+                    } else {
+                        screen.classList.add('hidden');
+                    }
+                });
+            });
+        });
+
+
+        // STATION 1: MICROSCOPE ENGINE
+        const btnSampleAnimal = document.getElementById('btn-sample-animal');
+        const btnSamplePlant = document.getElementById('btn-sample-plant');
+        const svgAnimal = document.getElementById('svg-animal');
+        const svgPlant = document.getElementById('svg-plant');
+
+        const sliderZoom = document.getElementById('slider-zoom');
+        const sliderFocus = document.getElementById('slider-focus');
+        const sliderLight = document.getElementById('slider-light');
+
+        const lblZoom = document.getElementById('lbl-zoom');
+        const lblFocus = document.getElementById('lbl-focus');
+        const lblLight = document.getElementById('lbl-light');
+
+        const eyepieceStage = document.getElementById('eyepiece-stage');
+        const lightLensOverlay = document.getElementById('light-lens-overlay');
+
+        let activeSample = 'animal';
+
+        // Toggle Sample Slides
+        btnSampleAnimal.addEventListener('click', () => {
+            activeSample = 'animal';
+            btnSampleAnimal.className = "sample-btn px-4 py-3 rounded-xl border border-emerald-500 bg-emerald-500/10 text-emerald-400 text-sm font-semibold transition flex items-center justify-center gap-2";
+            btnSamplePlant.className = "sample-btn px-4 py-3 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 text-sm font-semibold transition hover:bg-slate-800 flex items-center justify-center gap-2";
+            svgAnimal.classList.remove('hidden');
+            svgPlant.classList.add('hidden');
+            globalLog.textContent = "Loaded Animal Epithelial (Cheek) Slide. Observe irregular outer cell membrane and distinct nucleoplasm centers.";
+            calculateOptics();
+            clearTooltip();
+        });
+
+        btnSamplePlant.addEventListener('click', () => {
+            activeSample = 'plant';
+            btnSamplePlant.className = "sample-btn px-4 py-3 rounded-xl border border-emerald-500 bg-emerald-500/10 text-emerald-400 text-sm font-semibold transition flex items-center justify-center gap-2";
+            btnSampleAnimal.className = "sample-btn px-4 py-3 rounded-xl border border-slate-800 bg-slate-900 text-slate-400 text-sm font-semibold transition hover:bg-slate-800 flex items-center justify-center gap-2";
+            svgPlant.classList.remove('hidden');
+            svgAnimal.classList.add('hidden');
+            globalLog.textContent = "Loaded Plant Epidermal (Onion) Slide. Notice the hexagonal, rigid cellulose cell wall boundaries and emerald chloroplast bodies.";
+            calculateOptics();
+            clearTooltip();
+        });
+
+        // Optics Mathematics & Real-Time Physical Changes
+        function calculateOptics() {
+            const zoom = parseFloat(sliderZoom.value);
+            const focus = parseFloat(sliderFocus.value);
+            const light = parseInt(sliderLight.value);
+
+            // 1. Zoom Multipliers
+            lblZoom.textContent = `${(zoom * 10).toFixed(1)}x`;
+            eyepieceStage.style.transform = `scale(${zoom})`;
+
+            // 2. Focal Distance Physics Engine (Optimal focus point dialed in precisely at 5.0)
+            const distanceToFocalPoint = Math.abs(5.0 - focus);
+            const blurLevel = distanceToFocalPoint * 3.2; // Scaling blur multiplier
+
+            if (blurLevel === 0) {
+                lblFocus.textContent = "Perfect Focus";
+                lblFocus.className = "text-emerald-400 font-bold font-mono";
+            } else if (blurLevel < 2) {
+                lblFocus.textContent = "Optimal Focus";
+                lblFocus.className = "text-sky-400 font-bold font-mono";
+            } else if (blurLevel < 6) {
+                lblFocus.textContent = "Slightly Blurry";
+                lblFocus.className = "text-amber-500 font-bold font-mono";
+            } else {
+                lblFocus.textContent = "Unfocused Blur";
+                lblFocus.className = "text-rose-500 font-bold font-mono";
+            }
+
+            // Apply blur to active sample
+            if (activeSample === 'animal') {
+                svgAnimal.style.filter = `blur(${blurLevel}px)`;
+            } else {
+                svgPlant.style.filter = `blur(${blurLevel}px)`;
+            }
+
+            // 3. Iris Light Control
+            lblLight.textContent = `${light}%`;
+            // Calculate light filter inverse percentage values
+            const opacityOfDarkness = 1 - (light / 100);
+            lightLensOverlay.style.backgroundColor = `rgba(0, 0, 0, ${opacityOfDarkness})`;
+        }
+
+        [sliderZoom, sliderFocus, sliderLight].forEach(input => {
+            input.addEventListener('input', calculateOptics);
+        });
+
+        // Initial Execution
+        calculateOptics();
+
+
+        // ORGANELLE HOVER & SELECTION IDENTIFICATION
+        const organellePlaceholder = document.getElementById('organelle-placeholder');
+        const organelleData = document.getElementById('organelle-data');
+        const organelleTitle = document.getElementById('organelle-title');
+        const organelleDescription = document.getElementById('organelle-description');
+
+        document.querySelectorAll('.organelle').forEach(elem => {
+            // Mouse Enter
+            elem.addEventListener('mouseenter', (e) => {
+                const name = elem.getAttribute('data-name');
+                const desc = elem.getAttribute('data-desc');
+                displayTooltip(name, desc);
+            });
+            // Click / Tap Support
+            elem.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const name = elem.getAttribute('data-name');
+                const desc = elem.getAttribute('data-desc');
+                displayTooltip(name, desc);
+                globalLog.textContent = `Identified: ${name} — ${desc}`;
+            });
+        });
+
+        function displayTooltip(name, desc) {
+            organellePlaceholder.classList.add('hidden');
+            organelleData.classList.remove('hidden');
+            organelleTitle.textContent = name;
+            organelleDescription.textContent = desc;
+        }
+
+        function clearTooltip() {
+            organellePlaceholder.classList.remove('hidden');
+            organelleData.classList.add('hidden');
+        }
+
+        // Clear tooltip if clicking empty space inside lens
+        eyepieceStage.addEventListener('click', () => {
+            clearTooltip();
+        });
+
+
+        // STATION 2: OSMOSIS & TONICITY SIMULATOR
+        const btnInjectOsmosis = document.getElementById('btn-inject-osmosis');
+        const beakerLiquid = document.getElementById('beaker-liquid');
+        const svgRbc = document.getElementById('svg-rbc');
+        const rbcMembrane = document.getElementById('rbc-membrane');
+        const rbcDimple = document.getElementById('rbc-dimple');
+
+        const flowIn = document.getElementById('flow-in');
+        const flowOut = document.getElementById('flow-out');
+
+        btnInjectOsmosis.addEventListener('click', () => {
+            const solution = document.querySelector('input[name="solution"]:checked').value;
+
+            if (solution === 'hypotonic') {
+                // Hypotonic State (Water enters RBC causing it to swell)
+                beakerLiquid.className = "absolute bottom-0 left-0 right-0 h-[80%] bg-sky-400/20 border-t border-sky-300/40 transition-all duration-700 ease-in-out rounded-b-[18px]";
+
+                // Swell RBC
+                svgRbc.style.transform = "scale(1.5)";
+
+                // Shape coordinates for Swollen Spherical Erythrocyte
+                rbcMembrane.setAttribute('d', 'M50,10 C72,10 90,28 90,50 C90,72 72,90 50,90 C28,90 10,72 10,50 C10,28 28,10 50,10 Z');
+                // Dimple disappears as tension expands internal cell walls
+                rbcDimple.setAttribute('d', 'M50,35 C58,35 65,42 65,50 C65,58 58,65 50,65 C42,65 35,58 35,50 C35,42 42,35 50,35 Z');
+                rbcDimple.style.opacity = "0.2";
+
+                // Show inward flux arrows
+                flowIn.classList.remove('hidden');
+                flowOut.classList.add('hidden');
+
+                globalLog.textContent = "Data Log: Hypotonic Solution. Extracellular water molecule concentrations exceed cytosolic concentrations. H2O surges inside via osmosis, stretching the lipid membrane to its physical limit (Cellular Lysis risk).";
+
+            } else if (solution === 'isotonic') {
+                // Isotonic State (Water in dynamic balance)
+                beakerLiquid.className = "absolute bottom-0 left-0 right-0 h-[80%] bg-sky-600/30 border-t border-sky-500/50 transition-all duration-700 ease-in-out rounded-b-[18px]";
+
+                // Reset scale
+                svgRbc.style.transform = "scale(1.0)";
+
+                // Normal Biconcave shape coordinates
+                rbcMembrane.setAttribute('d', 'M50,15 C70,15 85,30 85,50 C85,70 70,85 50,85 C30,85 15,70 15,50 C15,30 30,15 50,15 Z');
+                rbcDimple.setAttribute('d', 'M50,30 C60,30 70,38 70,50 C70,62 60,70 50,70 C40,70 30,62 30,50 C30,38 40,30 50,30 Z');
+                rbcDimple.style.opacity = "0.65";
+
+                // Show balanced flow (both slightly active)
+                flowIn.classList.remove('hidden');
+                flowOut.classList.remove('hidden');
+
+                globalLog.textContent = "Data Log: Isotonic Solution. Solute concentration is in perfect equilibrium. Water molecules exchange dynamically across channels equally in both directions, preserving the natural biconcave shape.";
+
+            } else if (solution === 'hypertonic') {
+                // Hypertonic State (Water leaves RBC causing crenation)
+                beakerLiquid.className = "absolute bottom-0 left-0 right-0 h-[80%] bg-amber-600/25 border-t border-amber-500/50 transition-all duration-700 ease-in-out rounded-b-[18px]";
+
+                // Shrink cell scale
+                svgRbc.style.transform = "scale(0.72)";
+
+                // Irregular, crenated shriveled spiky shape coordinates
+                rbcMembrane.setAttribute('d', 'M50,15 L62,18 L70,12 L72,26 L86,30 L80,45 L90,55 L78,65 L82,80 L66,80 L58,88 L50,80 L38,86 L32,74 L18,74 L24,60 L14,50 L26,40 L22,24 L38,28 Z');
+                // Intensely dark indented center
+                rbcDimple.setAttribute('d', 'M50,38 C56,38 62,44 62,50 C62,56 56,62 50,62 C44,62 38,56 38,50 C38,44 44,38 50,38 Z');
+                rbcDimple.style.opacity = "0.9";
+
+                // Show outward water flux arrows
+                flowIn.classList.add('hidden');
+                flowOut.classList.remove('hidden');
+
+                globalLog.textContent = "Data Log: Hypertonic Solution. High saline concentration outside draws fluid out of the cellular cytoplasm rapidly. The lipid membrane collapses, crumpling inward into a star-shaped morphology (Crenation).";
+            }
+        });
+    </script>
+</body>
+
+</html>

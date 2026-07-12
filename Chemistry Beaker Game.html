@@ -1,0 +1,1397 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Pro Virtual Chemistry Lab</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        :root {
+            --bg-dark: #070913;
+            --panel-bg: rgba(22, 26, 43, 0.7);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent-blue: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.4);
+            --accent-green: #22c55e;
+            --danger: #f43f5e;
+            --board-bg: #020617;
+            --board-text: #6ee7b7;
+            --hud-font: 'JetBrains Mono', monospace;
+            --main-font: 'Inter', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: var(--main-font);
+            user-select: none;
+        }
+
+        body {
+            background: radial-gradient(circle at 50% 0%, #151b30 0%, var(--bg-dark) 80%);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            padding: 25px;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        header {
+            width: 100%;
+            max-width: 1200px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        header h1 {
+            font-size: 2rem;
+            color: var(--text-main);
+            font-weight: 300;
+            letter-spacing: 2px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        header h1 strong {
+            color: var(--accent-blue);
+            text-shadow: 0 0 15px var(--accent-glow);
+            font-weight: 700;
+        }
+
+        .header-badge {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid var(--accent-blue);
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            color: var(--accent-blue);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            box-shadow: 0 0 10px var(--accent-glow);
+        }
+
+        /* Main Grid Layout */
+        .lab-container {
+            display: grid;
+            grid-template-columns: 300px 1fr 340px;
+            gap: 25px;
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        @media (max-width: 1024px) {
+            .lab-container {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+        }
+
+        /* Panels General */
+        .panel {
+            background: var(--panel-bg);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 16px;
+            border: 1px solid var(--glass-border);
+            padding: 22px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel-title {
+            font-size: 0.85rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: var(--text-muted);
+            margin-bottom: 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .panel-title::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: var(--accent-blue);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-glow);
+        }
+
+        /* Category Tabs */
+        .category-tabs {
+            display: flex;
+            gap: 6px;
+            margin-bottom: 20px;
+            overflow-x: auto;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 6px;
+            border-radius: 10px;
+            border: 1px solid var(--glass-border);
+        }
+
+        .category-tabs::-webkit-scrollbar {
+            display: none;
+        }
+
+        .tab-btn {
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            flex: 1;
+            text-align: center;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .tab-btn:hover {
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text-main);
+        }
+
+        .tab-btn.active {
+            background: var(--accent-blue);
+            color: #000;
+            box-shadow: 0 0 12px var(--accent-glow);
+        }
+
+        /* Tab Content */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(5px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Reagent Shelf */
+        .reagent-bottle {
+            display: flex;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            padding: 12px 15px;
+            border-radius: 10px;
+            cursor: grab;
+            transition: all 0.2s ease;
+            touch-action: none;
+        }
+
+        .reagent-bottle:hover {
+            background: rgba(56, 189, 248, 0.05);
+            border-color: var(--accent-blue);
+            transform: translateX(6px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .reagent-bottle:active {
+            cursor: grabbing;
+            transform: translateX(2px) scale(0.98);
+        }
+
+        .bottle-icon {
+            font-size: 1.8rem;
+            margin-right: 15px;
+            background: rgba(0, 0, 0, 0.2);
+            width: 45px;
+            height: 45px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .bottle-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bottle-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+
+        .bottle-formula {
+            font-size: 0.75rem;
+            color: var(--accent-blue);
+            font-family: var(--hud-font);
+            margin-top: 4px;
+            opacity: 0.9;
+        }
+
+        /* Center Workstation */
+        .workstation {
+            align-items: center;
+            justify-content: center;
+        }
+
+        .canvas-container {
+            position: relative;
+            background: radial-gradient(circle at center, rgba(42, 49, 73, 0.6) 0%, transparent 70%);
+            border-radius: 24px;
+            padding: 30px;
+            border: 2px dashed rgba(255, 255, 255, 0.1);
+            transition: all 0.3s;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+
+        .canvas-container.drag-over {
+            border-color: var(--accent-green);
+            background: radial-gradient(circle at center, rgba(34, 197, 94, 0.15) 0%, transparent 70%);
+            box-shadow: 0 0 30px rgba(34, 197, 94, 0.1);
+        }
+
+        .canvas-container.pour-anim {
+            animation: flash 0.5s cubic-bezier(0.1, 0.8, 0.3, 1);
+        }
+
+        @keyframes flash {
+            0% {
+                box-shadow: inset 0 0 40px var(--accent-blue), 0 0 40px var(--accent-blue);
+                border-color: var(--accent-blue);
+            }
+
+            100% {
+                box-shadow: inset 0 0 0 transparent, 0 0 0 transparent;
+                border-color: rgba(255, 255, 255, 0.1);
+            }
+        }
+
+        .drop-instructions {
+            position: absolute;
+            bottom: 15px;
+            /* Moved up from -35px */
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.6);
+            /* Slightly darker for better contrast */
+            padding: 6px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            z-index: 10;
+            /* Ensure it stays above the canvas */
+        }
+
+        /* Right Panel: Instrumentation & Formulations */
+        .instruments {
+            gap: 25px;
+        }
+
+        /* Digital Sensors */
+        .sensor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .sensor {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 14px;
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .sensor::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--text-muted);
+            opacity: 0.3;
+        }
+
+        .sensor.active-sensor::before {
+            background: var(--accent-green);
+            opacity: 1;
+            box-shadow: 0 0 10px var(--accent-green);
+        }
+
+        .sensor-label {
+            font-size: 0.65rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .sensor-value {
+            font-family: var(--hud-font);
+            font-size: 1.25rem;
+            color: var(--text-main);
+            margin-top: 6px;
+            text-shadow: 0 0 10px rgba(255, 255, 255, 0.2);
+        }
+
+        .sensor-value.digital-glow {
+            color: var(--accent-green);
+            text-shadow: 0 0 12px rgba(34, 197, 94, 0.4);
+        }
+
+        /* Reaction Smartboard */
+        .reaction-board {
+            background: var(--board-bg);
+            border: 1px solid #1e293b;
+            border-radius: 12px;
+            padding: 20px;
+            min-height: 140px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8);
+            overflow: hidden;
+        }
+
+        /* Smartboard Grid overlay */
+        .reaction-board::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 15px 15px;
+            pointer-events: none;
+        }
+
+        .reaction-title {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 12px;
+            z-index: 1;
+        }
+
+        .reaction-equation {
+            font-family: var(--hud-font);
+            font-size: 0.95rem;
+            color: var(--board-text);
+            line-height: 1.6;
+            z-index: 1;
+            text-shadow: 0 0 8px rgba(110, 231, 183, 0.3);
+        }
+
+        /* Controls */
+        .controls {
+            margin-top: auto;
+        }
+
+        button.btn-danger {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #e11d48, #be123c);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(225, 29, 72, 0.3);
+        }
+
+        button.btn-danger:hover {
+            background: linear-gradient(135deg, #f43f5e, #e11d48);
+            box-shadow: 0 6px 20px rgba(225, 29, 72, 0.5);
+            transform: translateY(-2px);
+        }
+
+        button.btn-danger:active {
+            transform: translateY(1px);
+        }
+
+        /* Drag Clone */
+        .dragging-clone {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            opacity: 0.95;
+            transform: scale(1.05) rotate(-5deg);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+            background: var(--panel-bg);
+            border: 1px solid var(--accent-blue);
+            border-radius: 10px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>VIRTUAL <strong>CHEM_LAB</strong></h1>
+        <div class="header-badge">STP Simulator v2.0</div>
+    </header>
+
+    <div class="lab-container">
+
+        <!-- Left: Chemical Reagents & Equipment -->
+        <div class="panel">
+            <div class="panel-title">Resource Shelf</div>
+
+            <div class="category-tabs">
+                <button class="tab-btn active" data-tab="acids">Acids</button>
+                <button class="tab-btn" data-tab="bases">Bases</button>
+                <button class="tab-btn" data-tab="salts">Salts</button>
+                <button class="tab-btn" data-tab="indicators">Indicators</button>
+                <button class="tab-btn" data-tab="misc">Misc</button>
+                <button class="tab-btn" data-tab="equip">Tools</button>
+            </div>
+
+            <!-- ACIDS -->
+            <div id="tab-acids" class="tab-content active">
+                <div class="reagent-bottle" data-chemical="HCL">
+                    <div class="bottle-icon">🧪</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Hydrochloric Acid</span>
+                        <span class="bottle-formula">HCl (0.1M)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="H2SO4">
+                    <div class="bottle-icon">🧪</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Sulfuric Acid</span>
+                        <span class="bottle-formula">H₂SO₄ (0.1M)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="HNO3">
+                    <div class="bottle-icon">🧪</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Nitric Acid</span>
+                        <span class="bottle-formula">HNO₃ (0.1M)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="CH3COOH">
+                    <div class="bottle-icon">🧪</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Acetic Acid</span>
+                        <span class="bottle-formula">CH₃COOH (Weak)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- BASES -->
+            <div id="tab-bases" class="tab-content">
+                <div class="reagent-bottle" data-chemical="NAOH">
+                    <div class="bottle-icon">🫙</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Sodium Hydroxide</span>
+                        <span class="bottle-formula">NaOH (0.1M)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="KOH">
+                    <div class="bottle-icon">🫙</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Potassium Hydroxide</span>
+                        <span class="bottle-formula">KOH (0.1M)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="NH3">
+                    <div class="bottle-icon">🫙</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Ammonia Solution</span>
+                        <span class="bottle-formula">NH₃(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="CAOH2">
+                    <div class="bottle-icon">🫙</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Calcium Hydroxide</span>
+                        <span class="bottle-formula">Ca(OH)₂</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SALTS -->
+            <div id="tab-salts" class="tab-content">
+                <div class="reagent-bottle" data-chemical="NACL">
+                    <div class="bottle-icon">🧂</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Sodium Chloride</span>
+                        <span class="bottle-formula">NaCl(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="CUSO4">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Copper(II) Sulfate</span>
+                        <span class="bottle-formula">CuSO₄(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="KI">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Potassium Iodide</span>
+                        <span class="bottle-formula">KI(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="PBNO32">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Lead(II) Nitrate</span>
+                        <span class="bottle-formula">Pb(NO₃)₂</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="AGNO3">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Silver Nitrate</span>
+                        <span class="bottle-formula">AgNO₃(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="KMNO4">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Potass. Permanganate</span>
+                        <span class="bottle-formula">KMnO₄(aq)</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="FECL3">
+                    <div class="bottle-icon">💧</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Iron(III) Chloride</span>
+                        <span class="bottle-formula">FeCl₃(aq)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- INDICATORS -->
+            <div id="tab-indicators" class="tab-content">
+                <div class="reagent-bottle" data-tool="LITMUS_RED">
+                    <div class="bottle-icon">🟥</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Red Litmus Paper</span>
+                        <span class="bottle-formula">Base Test Strip</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="LITMUS_BLUE">
+                    <div class="bottle-icon">🟦</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Blue Litmus Paper</span>
+                        <span class="bottle-formula">Acid Test Strip</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="PHENOL">
+                    <div class="bottle-icon">👁️</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Phenolphthalein</span>
+                        <span class="bottle-formula">Base detector</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="UNIV">
+                    <div class="bottle-icon">🌈</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Universal Indicator</span>
+                        <span class="bottle-formula">Full pH Scale</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="METHYL_ORANGE">
+                    <div class="bottle-icon">🟠</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Methyl Orange</span>
+                        <span class="bottle-formula">Acid detector</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="BROMOTHYMOL">
+                    <div class="bottle-icon">🔵</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Bromothymol Blue</span>
+                        <span class="bottle-formula">Neutral detector</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- MISC (Solvents & Reactants) -->
+            <div id="tab-misc" class="tab-content">
+                <div class="reagent-bottle" data-chemical="H2O">
+                    <div class="bottle-icon">🚰</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Distilled Water</span>
+                        <span class="bottle-formula">H₂O</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="ETHANOL">
+                    <div class="bottle-icon">🧴</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Ethanol</span>
+                        <span class="bottle-formula">C₂H₅OH</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-chemical="H2O2">
+                    <div class="bottle-icon">💥</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Hydrogen Peroxide</span>
+                        <span class="bottle-formula">H₂O₂ (3%)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- EQUIPMENT -->
+            <div id="tab-equip" class="tab-content">
+                <div class="reagent-bottle" data-tool="THERMOMETER">
+                    <div class="bottle-icon">🌡️</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Thermometer</span>
+                        <span class="bottle-formula">Insert Probe</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="STIRRER">
+                    <div class="bottle-icon">🌪️</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Magnetic Stirrer</span>
+                        <span class="bottle-formula">Toggle Spin</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="HOTPLATE">
+                    <div class="bottle-icon">♨️</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Hot Plate</span>
+                        <span class="bottle-formula">Toggle Heater</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="BURNER">
+                    <div class="bottle-icon">🔥</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Bunsen Burner</span>
+                        <span class="bottle-formula">Toggle Flame</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="PIPETTE">
+                    <div class="bottle-icon">🧪</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Pipette</span>
+                        <span class="bottle-formula">Extract 10mL</span>
+                    </div>
+                </div>
+                <div class="reagent-bottle" data-tool="ICE">
+                    <div class="bottle-icon">🧊</div>
+                    <div class="bottle-details">
+                        <span class="bottle-name">Ice Bath</span>
+                        <span class="bottle-formula">Rapid Cooling</span>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Center: Beaker Canvas -->
+        <div class="panel workstation">
+            <div class="panel-title" style="align-self: flex-start;">Lab Workstation</div>
+
+            <div class="canvas-container" id="dropZone">
+                <canvas id="labCanvas" width="320" height="380"></canvas>
+                <div class="drop-instructions">DROP ITEMS HERE</div>
+            </div>
+        </div>
+
+        <!-- Right: Instrumentation -->
+        <div class="panel instruments">
+            <div class="panel-title">Live Telemetry</div>
+
+            <div class="sensor-grid">
+                <div class="sensor active-sensor">
+                    <span class="sensor-label">pH Probe</span>
+                    <span class="sensor-value digital-glow" id="disp-ph">--</span>
+                </div>
+                <div class="sensor" id="sensor-temp">
+                    <span class="sensor-label">Thermometer</span>
+                    <span class="sensor-value" id="disp-temp" style="font-size: 0.9rem; margin-top:10px;">Requires
+                        Probe</span>
+                </div>
+                <div class="sensor active-sensor">
+                    <span class="sensor-label">Volume</span>
+                    <span class="sensor-value digital-glow" id="disp-vol">0 mL</span>
+                </div>
+                <div class="sensor active-sensor">
+                    <span class="sensor-label">Precipitate</span>
+                    <span class="sensor-value" id="disp-precip" style="font-size: 0.85rem; margin-top:10px;">None</span>
+                </div>
+            </div>
+
+            <div class="reaction-board">
+                <div class="reaction-title">Smartboard Formulation</div>
+                <div class="reaction-equation" id="disp-equation">
+                    <span style="opacity:0.5; font-size:0.9rem;">(Awaiting Reagents)</span>
+                </div>
+            </div>
+
+            <div class="controls">
+                <button class="btn-danger" onclick="window.lab.reset()">Empty & Clean Beaker</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        /**
+         * Chemistry Simulation Engine
+         */
+        class ChemistryEngine {
+            constructor(canvasId) {
+                this.canvas = document.getElementById(canvasId);
+                this.ctx = this.canvas.getContext("2d");
+
+                // Chemical Properties
+                this.catalog = {
+                    "H2O": { pH: 7.0, color: [200, 230, 255, 0.2] },
+                    "HCL": { pH: 1.0, color: [255, 255, 255, 0.1] },
+                    "H2SO4": { pH: 0.8, color: [255, 255, 255, 0.1] },
+                    "HNO3": { pH: 1.2, color: [255, 255, 255, 0.1] },
+                    "CH3COOH": { pH: 3.0, color: [255, 255, 255, 0.1] },
+                    "NAOH": { pH: 13.0, color: [255, 255, 255, 0.1] },
+                    "KOH": { pH: 13.5, color: [255, 255, 255, 0.1] },
+                    "NH3": { pH: 11.5, color: [255, 255, 255, 0.1] },
+                    "CAOH2": { pH: 12.0, color: [255, 255, 255, 0.1] },
+                    "NACL": { pH: 7.0, color: [255, 255, 255, 0.1] },
+                    "CUSO4": { pH: 5.5, color: [30, 144, 255, 0.6] },
+                    "KI": { pH: 7.0, color: [255, 255, 255, 0.1] },
+                    "PBNO32": { pH: 4.5, color: [255, 255, 255, 0.1] },
+                    "AGNO3": { pH: 6.0, color: [255, 255, 255, 0.1] },
+                    "KMNO4": { pH: 7.0, color: [147, 51, 234, 0.8] }, // Purple
+                    "FECL3": { pH: 2.5, color: [217, 119, 6, 0.6] }, // Yellow-Orange
+                    "PHENOL": { pH: 7.0, color: [255, 255, 255, 0.1] },
+                    "UNIV": { pH: 7.0, color: [74, 222, 128, 0.5] }, // Green at pH 7
+                    "METHYL_ORANGE": { pH: 7.0, color: [255, 165, 0, 0.4] }, // Orange
+                    "BROMOTHYMOL": { pH: 7.0, color: [0, 0, 255, 0.2] }, // Blue
+                    "ETHANOL": { pH: 7.0, color: [255, 255, 255, 0.1] },
+                    "H2O2": { pH: 6.0, color: [255, 255, 255, 0.1] }
+                };
+
+                this.reset();
+                this.startRenderLoop();
+            }
+
+            reset() {
+                this.state = {
+                    maxVol: 500,
+                    currentVol: 0,
+                    temp: 25.0,
+                    pH: 7.0,
+                    contents: {},
+                    color: [255, 255, 255, 0.0],
+                    precipitate: null,
+                    bubbles: [],
+                    burnerActive: false,
+                    hotplateActive: false,
+                    stirrerActive: false,
+                    thermometerActive: false,
+                    stirAngle: 0,
+                    equationHtml: "<span style='opacity:0.5; font-size:0.9rem;'>(Beaker is empty)</span>"
+                };
+                this.updateUI();
+            }
+
+            // Tools (Burner, Pipette, Ice Bath, Thermometer, Hot Plate, Stirrer, LITMUS PAPERS)
+            useTool(toolKey) {
+                if (toolKey === "LITMUS_RED") {
+                    if (this.state.currentVol === 0) {
+                        this.state.equationHtml = "Red Litmus dropped.<br><span style='font-size:0.8rem'>(No fluid to test)</span>";
+                    } else if (this.state.pH > 8.0) {
+                        this.state.equationHtml = "Red Litmus Paper added.<br><span style='color:#38bdf8; font-weight:bold; font-size:1.1rem; text-shadow:0 0 10px #38bdf8;'>Turned BLUE (Base)</span>";
+                    } else {
+                        this.state.equationHtml = "Red Litmus Paper added.<br><span style='color:#f43f5e; font-weight:bold; font-size:1.1rem;'>Stayed RED (Acid/Neutral)</span>";
+                    }
+                } else if (toolKey === "LITMUS_BLUE") {
+                    if (this.state.currentVol === 0) {
+                        this.state.equationHtml = "Blue Litmus dropped.<br><span style='font-size:0.8rem'>(No fluid to test)</span>";
+                    } else if (this.state.pH < 6.0) {
+                        this.state.equationHtml = "Blue Litmus Paper added.<br><span style='color:#f43f5e; font-weight:bold; font-size:1.1rem; text-shadow:0 0 10px #f43f5e;'>Turned RED (Acid)</span>";
+                    } else {
+                        this.state.equationHtml = "Blue Litmus Paper added.<br><span style='color:#38bdf8; font-weight:bold; font-size:1.1rem;'>Stayed BLUE (Base/Neutral)</span>";
+                    }
+                } else if (toolKey === "BURNER") {
+                    this.state.burnerActive = !this.state.burnerActive;
+                    if (this.state.burnerActive) this.state.hotplateActive = false;
+                    this.state.equationHtml = this.state.burnerActive ? "<span style='color:#f43f5e'>Bunsen Burner IGNITED.</span><br>Heating solution..." : "Bunsen Burner EXTINGUISHED.";
+                } else if (toolKey === "HOTPLATE") {
+                    this.state.hotplateActive = !this.state.hotplateActive;
+                    if (this.state.hotplateActive) this.state.burnerActive = false;
+                    this.state.equationHtml = this.state.hotplateActive ? "<span style='color:#f43f5e'>Hot Plate TURNED ON.</span><br>Heating solution..." : "Hot Plate TURNED OFF.";
+                } else if (toolKey === "STIRRER") {
+                    this.state.stirrerActive = !this.state.stirrerActive;
+                    this.state.equationHtml = this.state.stirrerActive ? "Magnetic Stirrer ACTIVATED.<br>Mixing contents..." : "Magnetic Stirrer DEACTIVATED.";
+                } else if (toolKey === "THERMOMETER") {
+                    this.state.thermometerActive = !this.state.thermometerActive;
+                    this.state.equationHtml = this.state.thermometerActive ? "Thermometer INSERTED.<br>Monitoring temperature." : "Thermometer REMOVED.";
+                } else if (toolKey === "PIPETTE") {
+                    if (this.state.currentVol >= 10) {
+                        this.state.currentVol -= 10;
+                        for (let key in this.state.contents) {
+                            this.state.contents[key] *= (this.state.currentVol / (this.state.currentVol + 10));
+                        }
+                        this.state.equationHtml = "Pipette used.<br>Extracted 10 mL.";
+                    } else {
+                        this.reset();
+                    }
+                } else if (toolKey === "ICE") {
+                    this.state.temp = Math.max(0, this.state.temp - 20);
+                    this.state.burnerActive = false;
+                    this.state.hotplateActive = false;
+                    this.state.equationHtml = "<span style='color:#38bdf8'>Ice Bath applied.</span><br>Rapid cooling.";
+                }
+                this.updateUI();
+            }
+
+            pour(chemicalKey, amount = 20) {
+                if (this.state.currentVol + amount > this.state.maxVol) {
+                    alert("Beaker capacity reached! Please empty the beaker.");
+                    return;
+                }
+
+                const addedProps = this.catalog[chemicalKey];
+
+                if (this.state.currentVol === 0) {
+                    this.state.pH = addedProps.pH;
+                    this.state.color = [...addedProps.color];
+                } else {
+                    const ratio = amount / (this.state.currentVol + amount);
+                    for (let i = 0; i < 3; i++) {
+                        this.state.color[i] = Math.round(this.state.color[i] * (1 - ratio) + addedProps.color[i] * ratio);
+                    }
+                    this.state.color[3] = Math.min(0.85, this.state.color[3] * (1 - ratio) + addedProps.color[3] * ratio);
+                }
+
+                this.state.currentVol += amount;
+                this.state.contents[chemicalKey] = (this.state.contents[chemicalKey] || 0) + amount;
+
+                this.calculateReactions(chemicalKey, amount);
+                this.updateUI();
+            }
+
+            calculateReactions(addedKey, addedAmount) {
+                let c = this.state.contents;
+                let reactionOccurred = false;
+
+                // 1. Acid-Base Neutralization
+                const totalAcid = (c["HCL"] || 0) + (c["H2SO4"] || 0) + (c["HNO3"] || 0) + (c["CH3COOH"] || 0);
+                const totalBase = (c["NAOH"] || 0) + (c["KOH"] || 0) + (c["NH3"] || 0) + (c["CAOH2"] || 0);
+
+                if (totalAcid > 0 && totalBase > 0) {
+                    const diff = totalAcid - totalBase;
+
+                    if (Math.abs(diff) <= 20) {
+                        this.state.pH = 7.0;
+                        this.state.temp = Math.min(60, this.state.temp + 5.5);
+                        this.state.equationHtml = "Acid + Base<br>↓<br>Salt + H₂O(l) + Heat";
+                        this.spawnBubbles(25);
+                        reactionOccurred = true;
+                    } else if (diff > 0) {
+                        this.state.pH = Math.max(0.8, 7.0 - (diff / 20));
+                        this.state.equationHtml = "Acid in Excess<br>Low pH";
+                    } else {
+                        this.state.pH = Math.min(13.0, 7.0 - (diff / 20));
+                        this.state.equationHtml = "Base in Excess<br>High pH";
+                    }
+                }
+                else if (addedKey === "HCL" || addedKey === "H2SO4" || addedKey === "HNO3" || addedKey === "CH3COOH") {
+                    this.state.pH = Math.max(0.8, this.state.pH - (addedAmount / 20));
+                    if (!reactionOccurred) this.state.equationHtml = `${addedKey} added<br>Acidic solution.`;
+                }
+                else if (addedKey === "NAOH" || addedKey === "KOH" || addedKey === "NH3" || addedKey === "CAOH2") {
+                    this.state.pH = Math.min(13.0, this.state.pH + (addedAmount / 20));
+                    if (!reactionOccurred) this.state.equationHtml = `${addedKey} added<br>Basic solution.`;
+                }
+
+                // 2. INDICATORS LOGIC
+                if (c["PHENOL"] > 0) {
+                    if (this.state.pH > 8.2) {
+                        this.state.color = [236, 72, 153, 0.7];
+                        this.state.equationHtml = "HIn(aq) + OH⁻(aq)<br>↓<br>In⁻(aq) [Pink] + H₂O";
+                        reactionOccurred = true;
+                    } else {
+                        if (!reactionOccurred) this.state.equationHtml = "HIn(aq) ⇌ H⁺(aq) + In⁻(aq)<br><span style='font-size:0.8rem'>[Colorless state]</span>";
+                    }
+                }
+
+                if (c["UNIV"] > 0 && !c["PHENOL"]) {
+                    let r, g, b;
+                    if (this.state.pH < 3) { r = 239; g = 68; b = 68; }
+                    else if (this.state.pH < 6) { r = 249; g = 115; b = 22; }
+                    else if (this.state.pH < 8) { r = 34; g = 197; b = 94; }
+                    else if (this.state.pH < 11) { r = 59; g = 130; b = 246; }
+                    else { r = 147; g = 51; b = 234; }
+
+                    this.state.color = [r, g, b, 0.7];
+                    if (!reactionOccurred) this.state.equationHtml = "Universal Indicator<br>Color shifted based on pH.";
+                }
+
+                if (c["METHYL_ORANGE"] > 0 && !c["UNIV"] && !c["PHENOL"]) {
+                    if (this.state.pH < 3.1) {
+                        this.state.color = [239, 68, 68, 0.7];
+                    } else if (this.state.pH > 4.4) {
+                        this.state.color = [250, 204, 21, 0.7];
+                    } else {
+                        this.state.color = [249, 115, 22, 0.7];
+                    }
+                    if (!reactionOccurred) this.state.equationHtml = "Methyl Orange<br>Acid = Red, Base = Yellow";
+                }
+
+                if (c["BROMOTHYMOL"] > 0 && !c["UNIV"] && !c["PHENOL"] && !c["METHYL_ORANGE"]) {
+                    if (this.state.pH < 6.0) {
+                        this.state.color = [250, 204, 21, 0.7];
+                    } else if (this.state.pH > 7.6) {
+                        this.state.color = [59, 130, 246, 0.7];
+                    } else {
+                        this.state.color = [34, 197, 94, 0.7];
+                    }
+                    if (!reactionOccurred) this.state.equationHtml = "Bromothymol Blue<br>Neutral indicator.";
+                }
+
+                // 3. Precipitations
+                if (c["CUSO4"] > 0 && totalBase > 0 && !this.state.precipitate) {
+                    this.state.precipitate = "Cu(OH)₂ (Blue Solid)";
+                    this.state.equationHtml = "<span style='color:#3b82f6'>Cu²⁺(aq)</span> + 2OH⁻(aq)<br>↓<br><span style='color:#60a5fa; font-weight:bold;'>Cu(OH)₂↓</span>";
+                    this.spawnBubbles(15);
+                    reactionOccurred = true;
+                }
+
+                if (c["PBNO32"] > 0 && c["KI"] > 0 && !this.state.precipitate) {
+                    this.state.precipitate = "PbI₂ (Yellow Solid)";
+                    this.state.color = [234, 179, 8, 0.8];
+                    this.state.equationHtml = "Pb²⁺(aq) + 2I⁻(aq)<br>↓<br><span style='color:#facc15; font-weight:bold;'>PbI₂↓ (Golden Rain)</span>";
+                    this.spawnBubbles(20);
+                    reactionOccurred = true;
+                }
+
+                const totalChloride = (c["HCL"] || 0) + (c["NACL"] || 0) + (c["FECL3"] || 0);
+                if (c["AGNO3"] > 0 && totalChloride > 0 && !this.state.precipitate) {
+                    this.state.precipitate = "AgCl (White Solid)";
+                    this.state.color = [248, 250, 252, 0.9];
+                    this.state.equationHtml = "Ag⁺(aq) + Cl⁻(aq)<br>↓<br><span style='color:#f8fafc; font-weight:bold;'>AgCl↓ (White Precipitate)</span>";
+                    this.spawnBubbles(15);
+                    reactionOccurred = true;
+                }
+
+                if (c["H2O2"] > 0 && c["KI"] > 0 && addedKey === "KI") {
+                    this.state.temp = Math.min(100, this.state.temp + 15);
+                    this.state.equationHtml = "2H₂O₂ (KI Catalyst)<br>↓<br>2H₂O(l) + O₂(g)↑";
+                    this.spawnBubbles(40);
+                    reactionOccurred = true;
+                }
+
+                // Default display
+                if (!reactionOccurred) {
+                    if (addedKey === "H2O" || addedKey === "ETHANOL") {
+                        this.state.equationHtml = `${addedKey === "H2O" ? "H₂O(l)" : "Solvent"} added<br>Solution diluted.`;
+                    } else {
+                        this.state.equationHtml = `${addedKey} dissolved in solution.`;
+                    }
+                }
+            }
+
+            spawnBubbles(count) {
+                for (let i = 0; i < count; i++) {
+                    this.state.bubbles.push({
+                        x: 80 + Math.random() * 160,
+                        y: 300,
+                        radius: 2 + Math.random() * 4,
+                        speed: 1.5 + Math.random() * 2
+                    });
+                }
+            }
+
+            updateUI() {
+                document.getElementById("disp-ph").innerText = this.state.currentVol === 0 ? "--" : this.state.pH.toFixed(2);
+                document.getElementById("disp-vol").innerText = Math.floor(this.state.currentVol) + " mL";
+
+                const pElem = document.getElementById("disp-precip");
+                if (this.state.precipitate) {
+                    pElem.innerText = this.state.precipitate;
+                    pElem.style.color = "#fbbf24";
+                } else {
+                    pElem.innerText = "None";
+                    pElem.style.color = "var(--text-main)";
+                }
+
+                document.getElementById("disp-equation").innerHTML = this.state.equationHtml;
+
+                const tempContainer = document.getElementById("sensor-temp");
+                const tempElement = document.getElementById("disp-temp");
+                if (this.state.thermometerActive) {
+                    tempContainer.classList.add("active-sensor");
+                    tempElement.innerText = this.state.temp.toFixed(1) + " °C";
+                    tempElement.classList.add("digital-glow");
+                    tempElement.style.fontSize = "1.25rem";
+                    tempElement.style.marginTop = "6px";
+                } else {
+                    tempContainer.classList.remove("active-sensor");
+                    tempElement.innerText = "Requires Probe";
+                    tempElement.classList.remove("digital-glow");
+                    tempElement.style.fontSize = "0.9rem";
+                    tempElement.style.marginTop = "10px";
+                }
+            }
+
+            startRenderLoop() {
+                const render = () => {
+                    if (this.state.burnerActive || this.state.hotplateActive) {
+                        const heatRate = this.state.burnerActive ? 0.15 : 0.08;
+                        this.state.temp += heatRate;
+                        if (this.state.temp > 100) this.state.temp = 100;
+
+                        if (this.state.temp >= 95 && this.state.currentVol > 0) {
+                            if (Math.random() > 0.6) this.spawnBubbles(1);
+                            this.state.currentVol = Math.max(0, this.state.currentVol - 0.05);
+                        }
+
+                        if (this.state.thermometerActive) {
+                            document.getElementById("disp-temp").innerText = this.state.temp.toFixed(1) + " °C";
+                        }
+                        document.getElementById("disp-vol").innerText = Math.floor(this.state.currentVol) + " mL";
+                        if (this.state.currentVol === 0) this.state.precipitate = null;
+                    }
+
+                    if (this.state.stirrerActive) {
+                        this.state.stirAngle += 0.4;
+                        if (this.state.currentVol > 0 && Math.random() > 0.8) {
+                            this.spawnBubbles(1);
+                        }
+                    }
+
+                    this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+
+                    const cW = this.canvas.width;
+                    const cH = this.canvas.height;
+
+                    const bX = 60;
+                    const bW = 200;
+                    const bH = 260;
+                    const bY = 50;
+                    const bBottom = bY + bH;
+
+                    // 1. Calculate Liquid Fill Level
+                    const fillRatio = this.state.currentVol / this.state.maxVol;
+                    const liquidH = fillRatio * (bH - 20);
+                    const liquidY = bBottom - liquidH;
+
+                    // 2. Draw Liquid
+                    if (this.state.currentVol > 0) {
+                        const [r, g, b, a] = this.state.color;
+                        this.ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
+
+                        this.ctx.beginPath();
+                        this.ctx.ellipse(bX + bW / 2, liquidY, bW / 2, 10, 0, 0, Math.PI * 2);
+                        this.ctx.fill();
+                        this.ctx.fillRect(bX, liquidY, bW, liquidH);
+                        this.ctx.beginPath();
+                        this.ctx.ellipse(bX + bW / 2, bBottom, bW / 2, 15, 0, 0, Math.PI);
+                        this.ctx.fill();
+                    }
+
+                    // 3. Draw Precipitate
+                    if (this.state.precipitate) {
+                        if (this.state.precipitate.includes("Yellow")) {
+                            this.ctx.fillStyle = "rgba(234, 179, 8, 0.95)";
+                        } else if (this.state.precipitate.includes("White")) {
+                            this.ctx.fillStyle = "rgba(248, 250, 252, 0.95)";
+                        } else {
+                            this.ctx.fillStyle = "rgba(30, 64, 175, 0.9)";
+                        }
+                        this.ctx.beginPath();
+                        this.ctx.ellipse(bX + bW / 2, bBottom, bW / 2, 15, 0, 0, Math.PI);
+                        this.ctx.fill();
+                        this.ctx.fillRect(bX, bBottom - 8, bW, 8);
+                    }
+
+                    // Draw Magnetic Stir Bar
+                    if (this.state.stirrerActive && this.state.currentVol > 0) {
+                        this.ctx.save();
+                        this.ctx.translate(bX + bW / 2, bBottom - 3);
+                        this.ctx.rotate(this.state.stirAngle);
+                        this.ctx.fillStyle = "#ffffff";
+                        this.ctx.beginPath();
+                        this.ctx.roundRect(-20, -5, 40, 10, 5);
+                        this.ctx.fill();
+                        this.ctx.strokeStyle = "rgba(0,0,0,0.5)";
+                        this.ctx.lineWidth = 1;
+                        this.ctx.stroke();
+                        this.ctx.restore();
+                    }
+
+                    // Update & Draw Bubbles
+                    this.ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+                    for (let i = this.state.bubbles.length - 1; i >= 0; i--) {
+                        let bub = this.state.bubbles[i];
+                        this.ctx.beginPath();
+                        this.ctx.arc(bub.x, bub.y, bub.radius, 0, Math.PI * 2);
+                        this.ctx.fill();
+
+                        if (this.state.stirrerActive) {
+                            const centerX = bX + bW / 2;
+                            bub.x += (centerX - bub.x) * 0.05 + (Math.random() - 0.5) * 4;
+                        }
+
+                        bub.y -= bub.speed;
+
+                        if (bub.y < liquidY + 5) {
+                            this.state.bubbles.splice(i, 1);
+                        }
+                    }
+
+                    // Draw Thermometer
+                    if (this.state.thermometerActive) {
+                        this.ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+                        this.ctx.strokeStyle = "#cbd5e1";
+                        this.ctx.lineWidth = 5;
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(bX + 30, bY - 30);
+                        this.ctx.lineTo(bX + 60, bBottom - 15);
+                        this.ctx.stroke();
+
+                        this.ctx.strokeStyle = "#ef4444";
+                        this.ctx.lineWidth = 3;
+                        this.ctx.beginPath();
+                        const fluidHeight = 15 + (this.state.temp / 100) * 150;
+                        const endX = bX + 60 - (fluidHeight * 0.17);
+                        const endY = bBottom - 15 - (fluidHeight * 0.98);
+                        this.ctx.moveTo(bX + 60, bBottom - 15);
+                        this.ctx.lineTo(endX, endY);
+                        this.ctx.stroke();
+
+                        this.ctx.fillStyle = "#ef4444";
+                        this.ctx.beginPath();
+                        this.ctx.arc(bX + 60, bBottom - 15, 6, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+
+                    // 4. Draw Glass Beaker (Modern Glass effect)
+                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+                    this.ctx.lineWidth = 3;
+
+                    this.ctx.beginPath();
+                    this.ctx.ellipse(bX + bW / 2, bY, bW / 2, 10, 0, Math.PI, Math.PI * 2);
+                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.2)";
+                    this.ctx.stroke();
+
+                    this.ctx.strokeStyle = "rgba(255, 255, 255, 0.7)";
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(bX, bY);
+                    this.ctx.lineTo(bX, bBottom);
+                    this.ctx.ellipse(bX + bW / 2, bBottom, bW / 2, 15, 0, Math.PI, 0, true);
+                    this.ctx.lineTo(bX + bW, bY);
+                    this.ctx.ellipse(bX + bW / 2, bY, bW / 2, 10, 0, 0, Math.PI);
+                    this.ctx.stroke();
+
+                    this.ctx.fillStyle = "rgba(255, 255, 255, 0.1)";
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(bX + 15, bY + 15);
+                    this.ctx.lineTo(bX + 40, bY + 15);
+                    this.ctx.lineTo(bX + 40, bBottom - 15);
+                    this.ctx.lineTo(bX + 15, bBottom - 15);
+                    this.ctx.fill();
+
+                    // Draw Hot Plate
+                    if (this.state.hotplateActive) {
+                        this.ctx.fillStyle = "#1e293b";
+                        this.ctx.fillRect(bX - 20, bBottom + 10, bW + 40, 25);
+
+                        this.ctx.fillStyle = "rgba(239, 68, 68, 0.9)";
+                        this.ctx.shadowColor = "rgba(239, 68, 68, 0.8)";
+                        this.ctx.shadowBlur = 10;
+                        this.ctx.fillRect(bX - 5, bBottom + 6, bW + 10, 4);
+                        this.ctx.shadowBlur = 0;
+                    }
+
+                    // Draw Burner
+                    if (this.state.burnerActive) {
+                        this.ctx.fillStyle = "#64748b";
+                        this.ctx.fillRect(bX + bW / 2 - 8, bBottom + 5, 16, 25);
+
+                        this.ctx.fillStyle = "rgba(239, 68, 68, 0.8)";
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(bX + bW / 2 - 12, bBottom + 5);
+                        this.ctx.lineTo(bX + bW / 2 + 12, bBottom + 5);
+                        this.ctx.lineTo(bX + bW / 2, bBottom - 5 - Math.random() * 12);
+                        this.ctx.fill();
+
+                        this.ctx.fillStyle = "rgba(250, 204, 21, 0.9)";
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(bX + bW / 2 - 6, bBottom + 5);
+                        this.ctx.lineTo(bX + bW / 2 + 6, bBottom + 5);
+                        this.ctx.lineTo(bX + bW / 2, bBottom - Math.random() * 6);
+                        this.ctx.fill();
+                    }
+
+                    // 5. Draw Measurement Ticks
+                    this.ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+                    this.ctx.font = "11px var(--hud-font)";
+                    this.ctx.textAlign = "right";
+                    this.ctx.lineWidth = 2;
+
+                    for (let vol = 100; vol <= 500; vol += 100) {
+                        const tickRatio = vol / this.state.maxVol;
+                        const tickY = bBottom - (tickRatio * (bH - 20));
+
+                        this.ctx.beginPath();
+                        this.ctx.moveTo(bX, tickY);
+                        this.ctx.lineTo(bX + 15, tickY);
+                        this.ctx.stroke();
+
+                        this.ctx.fillText(vol + " mL", bX - 8, tickY + 4);
+                    }
+
+                    requestAnimationFrame(render);
+                };
+
+                render();
+            }
+        }
+
+        /**
+         * Drag and Drop Interaction Controller
+         */
+        class DragDropController {
+            constructor(engineInstance) {
+                this.engine = engineInstance;
+                this.clone = null;
+                this.dropZone = document.getElementById("dropZone");
+                this.initEvents();
+            }
+
+            initEvents() {
+                const bottles = document.querySelectorAll(".reagent-bottle");
+                bottles.forEach(bottle => {
+                    bottle.addEventListener("pointerdown", (e) => this.startDrag(e, bottle));
+                });
+
+                window.addEventListener("pointermove", (e) => this.drag(e));
+                window.addEventListener("pointerup", (e) => this.endDrag(e));
+            }
+
+            startDrag(e, element) {
+                e.preventDefault();
+                this.activeChemical = element.dataset.chemical;
+                this.activeTool = element.dataset.tool;
+
+                this.clone = element.cloneNode(true);
+                this.clone.classList.add("dragging-clone");
+                this.clone.style.width = element.offsetWidth + "px";
+                document.body.appendChild(this.clone);
+
+                this.positionClone(e.clientX, e.clientY);
+            }
+
+            positionClone(x, y) {
+                if (!this.clone) return;
+                this.clone.style.left = (x - this.clone.offsetWidth / 2) + "px";
+                this.clone.style.top = (y - this.clone.offsetHeight / 2) + "px";
+
+                const rect = this.dropZone.getBoundingClientRect();
+                if (x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom) {
+                    this.dropZone.classList.add("drag-over");
+                } else {
+                    this.dropZone.classList.remove("drag-over");
+                }
+            }
+
+            drag(e) {
+                if (this.clone) {
+                    this.positionClone(e.clientX, e.clientY);
+                }
+            }
+
+            endDrag(e) {
+                if (!this.clone) return;
+
+                const rect = this.dropZone.getBoundingClientRect();
+                this.dropZone.classList.remove("drag-over");
+
+                if (e.clientX >= rect.left && e.clientX <= rect.right && e.clientY >= rect.top && e.clientY <= rect.bottom) {
+
+                    if (this.activeChemical) {
+                        this.engine.pour(this.activeChemical, 20);
+                    } else if (this.activeTool) {
+                        this.engine.useTool(this.activeTool);
+                    }
+
+                    this.dropZone.classList.add("pour-anim");
+                    setTimeout(() => this.dropZone.classList.remove("pour-anim"), 500);
+                }
+
+                this.clone.remove();
+                this.clone = null;
+                this.activeChemical = null;
+                this.activeTool = null;
+            }
+        }
+
+        window.onload = () => {
+            window.lab = new ChemistryEngine("labCanvas");
+            new DragDropController(window.lab);
+
+            const tabButtons = document.querySelectorAll('.tab-btn');
+            const tabContents = document.querySelectorAll('.tab-content');
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const currentBtn = e.currentTarget;
+                    const targetTabId = currentBtn.getAttribute('data-tab');
+
+                    tabButtons.forEach(el => el.classList.remove('active'));
+                    tabContents.forEach(el => el.classList.remove('active'));
+
+                    currentBtn.classList.add('active');
+                    document.getElementById('tab-' + targetTabId).classList.add('active');
+                });
+            });
+        };
+    </script>
+</body>
+
+</html>

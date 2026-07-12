@@ -16,6 +16,60 @@ const LANG_PAIRS = { hi: 'en|hi', te: 'en|te', mr: 'en|mr' };
 // ── Translation cache keyed by "originalText||langCode"
 const _cache = new Map();
 
+// Local fallback dictionary for core UI terms (offline support & rate limit bypass)
+const LOCAL_DICTIONARY = {
+  "Dashboard": {
+    hi: "डैशबोर्ड",
+    te: "డ్యాష్‌బోర్డ్",
+    mr: "डॅशबोर्ड"
+  },
+  "Scan & Solve": {
+    hi: "स्कैन और हल करें",
+    te: "స్కాన్ & పరిష్కరించండి",
+    mr: "स्कॅन आणि सोडवा"
+  },
+  "← Back": {
+    hi: "← पीछे",
+    te: "← వెనుకకు",
+    mr: "← मागे"
+  },
+  "← Back to Home": {
+    hi: "← होम पर वापस",
+    te: "← హోమ్‌కి తిరిగి వెళ్ళు",
+    mr: "← मुख्यपृष्ठावर परत"
+  },
+  "← Back to Dashboard": {
+    hi: "← डैशबोर्ड पर वापस",
+    te: "← డ్యాష్‌బోర్డ్‌కి తిరిగి వెళ్ళు",
+    mr: "← डॅशबोर्डवर परत"
+  },
+  "← Back to Labs": {
+    hi: "← लैब्स पर वापस",
+    te: "← ల్యాబ్స్ కి తిరిగి వెళ్ళు",
+    mr: "← लॅबवर परत"
+  },
+  "Video-Text Learning": {
+    hi: "वीडियो-टेक्स्ट लर्निंग",
+    te: "వీడియో-టెక్స్ట్ లెర్నింగ్",
+    mr: "व्हिडिओ-टेक्स्ट लर्निंग"
+  },
+  "Gamified Learning": {
+    hi: "गेमीफाइड लर्निंग",
+    te: "గేమిఫైడ్ లెర్నిंग",
+    mr: "गेमीफाइड लर्निंग"
+  },
+  "Start Learning": {
+    hi: "सीखना शुरू करें",
+    te: "నేర్చుకోవడం ప్రారంభించండి",
+    mr: "शिकायला सुरुवात करा"
+  },
+  "Play Games": {
+    hi: "खेलें",
+    te: "ఆటలు ఆడండి",
+    mr: "खेळ खेळा"
+  }
+};
+
 // ── Track the last translated language to detect screen changes
 let _lastTranslatedLang = null;
 let _isTranslating = false;
@@ -25,6 +79,11 @@ let _isTranslating = false;
 // ─────────────────────────────────────────────────────────────
 async function _fetchTranslation(text, langCode) {
   if (!text || !text.trim() || langCode === 'en') return text;
+
+  const trimmed = text.trim();
+  if (LOCAL_DICTIONARY[trimmed] && LOCAL_DICTIONARY[trimmed][langCode]) {
+    return LOCAL_DICTIONARY[trimmed][langCode];
+  }
 
   const cacheKey = `${text}||${langCode}`;
   if (_cache.has(cacheKey)) return _cache.get(cacheKey);

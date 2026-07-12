@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced DC Electric Circuits Lab</title>
+    <style>
+        :root {
+            --bg-color: #1a1a24;
+            --panel-bg: #2b2d42;
+            --text-color: #f8f9fa;
+            --accent: #ef233c;
+            --success: #38b000;
+            --wire-color: #4361ee;
+            --ai-color: #7209b7;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            padding: 12px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #3f405c;
+            flex-wrap: wrap;
+            gap: 10px;
+            z-index: 10;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            letter-spacing: 0.5px;
+            white-space: nowrap;
+        }
+
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+        }
+
+        button {
+            background-color: #495057;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        button:hover {
+            background-color: #6c757d;
+        }
+
+        button.active {
+            background-color: var(--accent);
+            box-shadow: 0 0 8px rgba(239, 35, 60, 0.5);
+        }
+
+        button.action-btn {
+            background-color: var(--success);
+        }
+
+        button.clear-btn {
+            background-color: #d90429;
+        }
+
+        button.ai-btn {
+            background-color: var(--ai-color);
+        }
+
+        button.ai-btn:hover {
+            background-color: #560bad;
+        }
+
+        .main-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+            overflow: hidden;
+        }
+
+        main {
+            flex: 1;
+            position: relative;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            cursor: crosshair;
+        }
+
+        /* Telemetry Overlay */
+        .stats-panel {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            background: rgba(43, 45, 66, 0.95);
+            padding: 15px 20px;
+            border-radius: 8px;
+            border: 1px solid #4a4e69;
+            pointer-events: none;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        .stats-panel h3 {
+            margin-bottom: 8px;
+            font-size: 1rem;
+            color: #8d99ae;
+            border-bottom: 1px solid #4a4e69;
+            padding-bottom: 4px;
+        }
+
+        .stats-panel p {
+            font-size: 0.95rem;
+            margin: 6px 0;
+            display: flex;
+            justify-content: space-between;
+            gap: 15px;
+        }
+
+        .stats-panel strong {
+            color: #edf2f4;
+        }
+
+        /* AI Tutor Panel */
+        .ai-panel {
+            width: 350px;
+            background-color: var(--panel-bg);
+            border-left: 2px solid #3f405c;
+            display: flex;
+            flex-direction: column;
+            transition: margin-right 0.3s ease;
+            box-shadow: -4px 0 15px rgba(0, 0, 0, 0.3);
+            z-index: 5;
+        }
+
+        .ai-panel.hidden {
+            margin-right: -350px;
+        }
+
+        .ai-header {
+            padding: 15px;
+            background: #1a1a24;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #3f405c;
+        }
+
+        .ai-chat {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .msg {
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            max-width: 90%;
+        }
+
+        .ai-msg {
+            background: #3f405c;
+            align-self: flex-start;
+            border-bottom-left-radius: 2px;
+        }
+
+        .user-msg {
+            background: var(--ai-color);
+            align-self: flex-end;
+            border-bottom-right-radius: 2px;
+        }
+
+        .ai-input-area {
+            padding: 15px;
+            background: #1a1a24;
+            display: flex;
+            gap: 8px;
+            border-top: 1px solid #3f405c;
+        }
+
+        .ai-input-area input {
+            flex: 1;
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #4a4e69;
+            background: #2b2d42;
+            color: white;
+            outline: none;
+        }
+
+        .ai-input-area input:focus {
+            border-color: var(--ai-color);
+        }
+
+        .hidden-elem {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body>
+
+    <header>
+        <h1>⚡ Adv. Circuits Lab</h1>
+        <div class="toolbar">
+            <button id="btn-interact" class="tool-btn active" onclick="selectTool('interact')">👆 Interact</button>
+            <div style="width: 2px; height: 20px; background: #6c757d; margin: 0 5px;"></div>
+            <button id="btn-battery" class="tool-btn" onclick="selectTool('battery')">🔋 Battery</button>
+            <button id="btn-resistor" class="tool-btn" onclick="selectTool('resistor')">〰️ Resistor</button>
+            <button id="btn-bulb" class="tool-btn" onclick="selectTool('bulb')">💡 Bulb</button>
+            <button id="btn-switch" class="tool-btn" onclick="selectTool('switch')">⭘ Switch</button>
+            <button id="btn-capacitor" class="tool-btn" onclick="selectTool('capacitor')">⏸ Capacitor</button>
+            <button id="btn-inductor" class="tool-btn" onclick="selectTool('inductor')">➰ Inductor</button>
+            <div style="width: 2px; height: 20px; background: #6c757d; margin: 0 5px;"></div>
+            <button id="btn-wire" class="tool-btn" onclick="selectTool('wire')">🧵 Wire</button>
+            <button id="btn-simulate" class="action-btn" onclick="toggleSimulation()">▶ Run</button>
+            <button class="clear-btn" onclick="clearLab()">🗑 Clear</button>
+            <button class="ai-btn" onclick="toggleAIPanel()">🤖 AI Tutor</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <main id="canvas-container">
+            <div class="stats-panel">
+                <h3>Circuit Telemetry</h3>
+                <p>Status: <strong id="sim-status" style="color: #ffd166;">Editing</strong></p>
+                <p>Voltage: <strong id="stat-v">0.0 V</strong></p>
+                <p>Resistance: <strong id="stat-r">0.0 Ω</strong></p>
+                <p>Current: <strong id="stat-i" style="color: #00f5d4;">0.00 A</strong></p>
+            </div>
+            <canvas id="labCanvas"></canvas>
+        </main>
+
+        <!-- Context-Aware AI Tutor Panel -->
+        <aside id="ai-panel" class="ai-panel hidden">
+            <div class="ai-header">
+                <h3>🤖 AI Physics Tutor</h3>
+                <button onclick="toggleAIPanel()" style="background: transparent; color: white;">✖</button>
+            </div>
+            <div class="ai-chat" id="ai-chat">
+                <div class="msg ai-msg">Hello! I can see your circuit. Ask me anything about how to connect it or why
+                    it's behaving a certain way!</div>
+                <div id="ai-loading" class="msg ai-msg hidden-elem">Thinking... ⏳</div>
+            </div>
+            <div class="ai-input-area">
+                <input type="text" id="ai-input" placeholder="Why isn't the bulb glowing?"
+                    onkeypress="if(event.key==='Enter') sendAIQuery()">
+                <button class="ai-btn" onclick="sendAIQuery()">Send</button>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('labCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Global App State
+        let components = [];
+        let wires = [];
+        let currentTool = 'interact';
+        let isSimulating = false;
+
+        // Interaction & Animation State
+        let selectedNode = null;
+        let animOffset = 0;
+        let mousePos = { x: 0, y: 0 };
+        let circuitCurrent = 0;
+        let isCircuitBroken = false;
+
+        // Responsive Canvas Resizing
+        function resizeCanvas() {
+            const container = document.getElementById('canvas-container');
+            canvas.width = container.clientWidth;
+            canvas.height = container.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+
+        // Call immediately and after a short delay to ensure UI reflows are complete
+        resizeCanvas();
+        setTimeout(resizeCanvas, 50);
+
+        // Track Mouse for Wire Dragging Line
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mousePos.x = e.clientX - rect.left;
+            mousePos.y = e.clientY - rect.top;
+        });
+
+        // --- Component Logic ---
+        class Component {
+            constructor(type, x, y) {
+                this.type = type;
+                this.x = Math.round(x / 30) * 30; // Snap to larger grid
+                this.y = Math.round(y / 30) * 30;
+                this.scale = 1.5;
+                this.hitRadius = 30;
+
+                this.voltage = type === 'battery' ? 9 : 0;
+                this.resistance = this.getDefaultResistance();
+                this.closed = false;
+                this.inLoop = false;
+
+                // Terminal Nodes
+                this.nodes = [
+                    { x: this.x - 60, y: this.y, parent: this, id: Math.random(), links: [] },
+                    { x: this.x + 60, y: this.y, parent: this, id: Math.random(), links: [] }
+                ];
+            }
+
+            getDefaultResistance() {
+                switch (this.type) {
+                    case 'resistor': return 10;
+                    case 'bulb': return 15;
+                    case 'inductor': return 2;
+                    case 'switch': return 0;
+                    case 'capacitor': return Infinity;
+                    default: return 0.1; // Battery internal resistance
+                }
+            }
+
+            toggle() {
+                if (this.type === 'switch') {
+                    this.closed = !this.closed;
+                    if (isSimulating) calculateCircuit();
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Draw Terminal Arms
+                ctx.strokeStyle = '#adb5bd';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                if (this.type === 'switch') {
+                    ctx.moveTo(-60, 0); ctx.lineTo(-25, 0);
+                    ctx.moveTo(25, 0); ctx.lineTo(60, 0);
+                } else if (this.type === 'capacitor') {
+                    ctx.moveTo(-60, 0); ctx.lineTo(-12, 0);
+                    ctx.moveTo(12, 0); ctx.lineTo(60, 0);
+                } else {
+                    ctx.moveTo(-60, 0); ctx.lineTo(-30, 0);
+                    ctx.moveTo(30, 0); ctx.lineTo(60, 0);
+                }
+                ctx.stroke();
+
+                ctx.scale(this.scale, this.scale);
+
+                // Draw Specific Body Graphics
+                if (this.type === 'battery') {
+                    ctx.fillStyle = '#2b2d42';
+                    ctx.fillRect(-20, -15, 40, 30);
+                    ctx.strokeStyle = '#ef233c'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(-10, -10); ctx.lineTo(-10, 10); ctx.stroke(); // Positive
+                    ctx.strokeStyle = '#8d99ae';
+                    ctx.beginPath(); ctx.moveTo(10, -5); ctx.lineTo(10, 5); ctx.stroke(); // Negative
+                    ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText('9V', 0, 26);
+                }
+                else if (this.type === 'resistor') {
+                    ctx.strokeStyle = '#ffb703'; ctx.lineWidth = 3; ctx.lineJoin = 'miter';
+                    ctx.beginPath(); ctx.moveTo(-20, 0);
+                    ctx.lineTo(-15, -12); ctx.lineTo(-5, 12); ctx.lineTo(5, -12); ctx.lineTo(15, 12); ctx.lineTo(20, 0);
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText('10Ω', 0, 26);
+                }
+                else if (this.type === 'bulb') {
+                    let isGlowing = this.inLoop && isSimulating && circuitCurrent > 0;
+                    if (isGlowing) {
+                        ctx.shadowColor = '#ffea00';
+                        ctx.shadowBlur = 25; // Massive glow
+                    }
+                    ctx.beginPath();
+                    ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                    ctx.fillStyle = isGlowing ? '#ffea00' : '#495057';
+                    ctx.fill();
+                    ctx.shadowBlur = 0; // Reset
+                    ctx.strokeStyle = '#ced4da'; ctx.lineWidth = 2; ctx.stroke();
+
+                    ctx.strokeStyle = isGlowing ? '#ff9e00' : '#adb5bd'; ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, -2, 6, 0, Math.PI); ctx.stroke(); // Filament
+                }
+                else if (this.type === 'switch') {
+                    ctx.fillStyle = '#ced4da';
+                    ctx.beginPath(); ctx.arc(-16, 0, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.beginPath(); ctx.arc(16, 0, 4, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = '#f8f9fa'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+                    ctx.beginPath();
+                    if (this.closed) { ctx.moveTo(-16, 0); ctx.lineTo(16, 0); } else { ctx.moveTo(-16, 0); ctx.lineTo(10, -18); }
+                    ctx.stroke();
+                    ctx.fillStyle = '#adb5bd'; ctx.font = '9px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText(this.closed ? 'ON' : 'OFF', 0, 24);
+                }
+                else if (this.type === 'capacitor') {
+                    ctx.strokeStyle = '#00b4d8'; ctx.lineWidth = 4;
+                    ctx.beginPath(); ctx.moveTo(-8, -15); ctx.lineTo(-8, 15); ctx.moveTo(8, -15); ctx.lineTo(8, 15); ctx.stroke();
+                    ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText('10µF', 0, 28);
+                }
+                else if (this.type === 'inductor') {
+                    ctx.strokeStyle = '#e85d04'; ctx.lineWidth = 3;
+                    ctx.beginPath();
+                    for (let i = 0; i < 3; i++) { ctx.arc(-12 + (i * 12), 0, 6, Math.PI, 0); }
+                    ctx.stroke();
+                    ctx.fillStyle = '#fff'; ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+                    ctx.fillText('5mH', 0, 24);
+                }
+
+                ctx.restore();
+
+                // Draw Nodes explicitly to make snapping targets visible
+                this.nodes.forEach(node => {
+                    ctx.beginPath();
+                    ctx.arc(node.x, node.y, 8, 0, Math.PI * 2);
+                    ctx.fillStyle = selectedNode === node ? '#ef233c' : '#00b4d8';
+                    ctx.fill();
+                    ctx.strokeStyle = '#1a1a24';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                });
+            }
+        }
+
+        // --- Toolbox Interactions ---
+        function selectTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${tool}`).classList.add('active');
+            selectedNode = null;
+
+            if (tool === 'interact') canvas.style.cursor = 'pointer';
+            else if (tool === 'wire') canvas.style.cursor = 'crosshair';
+            else canvas.style.cursor = 'cell';
+        }
+
+        function toggleSimulation() {
+            isSimulating = !isSimulating;
+            const btn = document.getElementById('btn-simulate');
+            if (isSimulating) {
+                btn.innerText = '⏸ Pause';
+                btn.style.backgroundColor = '#f77f00';
+                calculateCircuit();
+            } else {
+                btn.innerText = '▶ Run';
+                btn.style.backgroundColor = '#38b000';
+                circuitCurrent = 0;
+                components.forEach(c => c.inLoop = false);
+                wires.forEach(w => w.inLoop = false);
+                updateStats(0, 0, 0);
+            }
+        }
+
+        function clearLab() {
+            components = [];
+            wires = [];
+            selectedNode = null;
+            if (isSimulating) toggleSimulation();
+            updateStats(0, 0, 0);
+        }
+
+        // --- Circuit Nodal Pathfinding Simulator ---
+        function calculateCircuit() {
+            let totalV = 0;
+            let totalR = 0;
+            isCircuitBroken = false;
+            circuitCurrent = 0;
+
+            // Reset paths
+            components.forEach(c => c.inLoop = false);
+            wires.forEach(w => { w.inLoop = false; w.flowFrom = null; w.flowTo = null; });
+
+            let batteries = components.filter(c => c.type === 'battery');
+            if (batteries.length === 0) {
+                updateStats(0, 0, 0);
+                return;
+            }
+            let mainBattery = batteries[0]; // Assuming 1 primary power source for simple analysis
+
+            // Rebuild graph adjacency list dynamically
+            components.forEach(c => { c.nodes[0].links = []; c.nodes[1].links = []; });
+
+            wires.forEach(wire => {
+                wire.from.links.push(wire.to);
+                wire.to.links.push(wire.from);
+            });
+
+            components.forEach(comp => {
+                if (comp.type === 'switch' && !comp.closed) return;
+                if (comp.type === 'capacitor') return;
+                comp.nodes[0].links.push(comp.nodes[1]);
+                comp.nodes[1].links.push(comp.nodes[0]);
+            });
+
+            // Break internal battery link to force pathfinding to go OUTSIDE the battery to complete loop
+            mainBattery.nodes[0].links = mainBattery.nodes[0].links.filter(n => n !== mainBattery.nodes[1]);
+            mainBattery.nodes[1].links = mainBattery.nodes[1].links.filter(n => n !== mainBattery.nodes[0]);
+
+            // Breadth-First Search (BFS) for closed loop
+            let visited = new Set();
+            let queue = [[mainBattery.nodes[0]]];
+            let validNodePath = null;
+
+            while (queue.length > 0) {
+                let path = queue.shift();
+                let currNode = path[path.length - 1];
+
+                if (currNode === mainBattery.nodes[1]) {
+                    validNodePath = path;
+                    break;
+                }
+
+                if (!visited.has(currNode)) {
+                    visited.add(currNode);
+                    currNode.links.forEach(neighbor => {
+                        if (!visited.has(neighbor)) queue.push([...path, neighbor]);
+                    });
+                }
+            }
+
+            if (validNodePath) {
+                mainBattery.inLoop = true;
+                totalV = mainBattery.voltage;
+                totalR += mainBattery.resistance; // Base resistance
+
+                // Walk the path to trigger active visuals and aggregate resistance
+                for (let i = 0; i < validNodePath.length - 1; i++) {
+                    let n1 = validNodePath[i];
+                    let n2 = validNodePath[i + 1];
+
+                    if (n1.parent === n2.parent) {
+                        n1.parent.inLoop = true;
+                        totalR += n1.parent.resistance;
+                    } else {
+                        let wire = wires.find(w => (w.from === n1 && w.to === n2) || (w.from === n2 && w.to === n1));
+                        if (wire) {
+                            wire.inLoop = true;
+                            wire.flowFrom = n1;
+                            wire.flowTo = n2; // Dictates particle direction
+                        }
+                    }
+                }
+
+                circuitCurrent = totalV / (totalR === 0 ? 0.001 : totalR);
+                updateStats(totalV, totalR, circuitCurrent);
+            } else {
+                isCircuitBroken = components.some(c => (c.type === 'switch' && !c.closed) || c.type === 'capacitor');
+                updateStats(mainBattery.voltage, isCircuitBroken ? Infinity : 0, 0);
+            }
+        }
+
+        function updateStats(v, r, i) {
+            const statusText = document.getElementById('sim-status');
+            if (isSimulating) {
+                statusText.innerText = circuitCurrent === 0 ? 'Blocked / Open' : 'Running';
+                statusText.style.color = circuitCurrent === 0 ? '#ef233c' : '#38b000';
+            } else {
+                statusText.innerText = 'Editing';
+                statusText.style.color = '#ffd166';
+            }
+            document.getElementById('stat-v').innerText = `${v.toFixed(1)} V`;
+            document.getElementById('stat-r').innerText = r === Infinity ? `∞ Ω` : `${r.toFixed(1)} Ω`;
+            document.getElementById('stat-i').innerText = `${i.toFixed(2)} A`;
+        }
+
+        // --- User Actions ---
+        canvas.addEventListener('mousedown', (e) => {
+            if (currentTool === 'interact') {
+                components.forEach(comp => {
+                    if (Math.hypot(comp.x - mousePos.x, comp.y - mousePos.y) < comp.hitRadius * comp.scale) {
+                        comp.toggle();
+                    }
+                });
+                return;
+            }
+
+            if (currentTool === 'wire') {
+                let clickedNode = null;
+                components.forEach(comp => {
+                    comp.nodes.forEach(node => {
+                        if (Math.hypot(node.x - mousePos.x, node.y - mousePos.y) < 20) clickedNode = node;
+                    });
+                });
+
+                if (clickedNode) {
+                    if (!selectedNode) {
+                        selectedNode = clickedNode; // Start wire
+                    } else if (selectedNode !== clickedNode) {
+                        // Finish wire
+                        wires.push({ from: selectedNode, to: clickedNode, inLoop: false, flowFrom: null, flowTo: null });
+                        selectedNode = null;
+                        if (isSimulating) calculateCircuit();
+                    }
+                } else {
+                    selectedNode = null; // Cancel wire drag if clicked empty space
+                }
+            }
+            else {
+                // Prevent stacking
+                const existing = components.find(c => Math.hypot(c.x - mousePos.x, c.y - mousePos.y) < 30);
+                if (!existing) {
+                    components.push(new Component(currentTool, mousePos.x, mousePos.y));
+                    if (isSimulating) calculateCircuit();
+                }
+            }
+        });
+
+        // --- Canvas Rendering Loop ---
+        function render() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Grid
+            ctx.strokeStyle = '#282a36'; ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 30) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
+            for (let y = 0; y < canvas.height; y += 30) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
+
+            // Draw Placed Wires
+            wires.forEach(wire => {
+                ctx.strokeStyle = '#4361ee';
+                ctx.lineWidth = 5;
+                ctx.beginPath();
+                ctx.moveTo(wire.from.x, wire.from.y);
+                ctx.lineTo(wire.to.x, wire.to.y);
+                ctx.stroke();
+
+                // Draw flowing electrons if closed loop
+                if (wire.inLoop && isSimulating && circuitCurrent > 0) {
+                    const dx = wire.flowTo.x - wire.flowFrom.x;
+                    const dy = wire.flowTo.y - wire.flowFrom.y;
+                    const len = Math.hypot(dx, dy);
+                    const steps = Math.max(1, Math.floor(len / 25));
+
+                    ctx.shadowColor = '#00f5d4';
+                    ctx.shadowBlur = 12;
+                    ctx.fillStyle = '#00f5d4';
+                    for (let i = 0; i <= steps; i++) {
+                        const progress = ((i / steps) + animOffset) % 1;
+                        const ex = wire.flowFrom.x + dx * progress;
+                        const ey = wire.flowFrom.y + dy * progress;
+                        ctx.beginPath(); ctx.arc(ex, ey, 5, 0, Math.PI * 2); ctx.fill();
+                    }
+                    ctx.shadowBlur = 0; // reset
+                }
+            });
+
+            // Draw Wire Dragging Preview (Solves the UI confusion issue)
+            if (currentTool === 'wire' && selectedNode) {
+                ctx.strokeStyle = 'rgba(67, 97, 238, 0.7)';
+                ctx.lineWidth = 5;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.moveTo(selectedNode.x, selectedNode.y);
+                ctx.lineTo(mousePos.x, mousePos.y);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            components.forEach(comp => comp.draw());
+
+            if (isSimulating && circuitCurrent > 0) {
+                animOffset = (animOffset + 0.005 + (circuitCurrent * 0.005)) % 1;
+            }
+            requestAnimationFrame(render);
+        }
+        render();
+
+        // --- Gemini AI Tutor Integration ---
+        const apiKey = ""; // API key is injected by the environment
+
+        function toggleAIPanel() {
+            const panel = document.getElementById('ai-panel');
+            panel.classList.toggle('hidden');
+            setTimeout(resizeCanvas, 300); // Adjust canvas to available space
+        }
+
+        function appendMessage(sender, text) {
+            const chat = document.getElementById('ai-chat');
+            const loader = document.getElementById('ai-loading');
+            const msgDiv = document.createElement('div');
+            msgDiv.className = `msg ${sender === 'user' ? 'user-msg' : 'ai-msg'}`;
+
+            // Basic markdown bolding parsing
+            msgDiv.innerHTML = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            chat.insertBefore(msgDiv, loader);
+            chat.scrollTop = chat.scrollHeight;
+        }
+
+        async function sendAIQuery() {
+            const inputEl = document.getElementById('ai-input');
+            const userText = inputEl.value.trim();
+            if (!userText) return;
+
+            appendMessage('user', userText);
+            inputEl.value = '';
+
+            const loader = document.getElementById('ai-loading');
+            loader.classList.remove('hidden-elem');
+            const chat = document.getElementById('ai-chat');
+            chat.scrollTop = chat.scrollHeight;
+
+            // 1. Build circuit context to ground the LLM
+            const stateContext = `
+      Current Circuit Details:
+      - Is the Simulation Running?: ${isSimulating}
+      - Total Calculated Voltage: ${document.getElementById('stat-v').innerText}
+      - Total Calculated Resistance: ${document.getElementById('stat-r').innerText}
+      - Total Circuit Current: ${document.getElementById('stat-i').innerText}
+      - Current Components on canvas: ${components.length > 0 ? components.map(c => c.type).join(', ') : 'None'}
+      - Total Wires connected: ${wires.length}
+      `;
+
+            const payload = {
+                contents: [{ parts: [{ text: userText }] }],
+                systemInstruction: {
+                    parts: [{
+                        text: `You are a helpful AI physics tutor integrated into a virtual DC circuits lab simulator. 
+            Keep your answers encouraging, concise, and focused on helping the student build working circuits (max 3 sentences).
+            Analyze the following live circuit data to accurately answer their question:
+            ${stateContext}
+            If they ask why electricity isn't flowing, check if they forgot to click "Run Simulation", if a switch is open (resistance is ∞), or if they don't have enough wires to form a closed loop.`
+                    }]
+                }
+            };
+
+            try {
+                const responseText = await fetchWithRetry(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                appendMessage('ai', responseText);
+            } catch (err) {
+                appendMessage('ai', "I'm having trouble connecting to my systems right now. Check your internet or try again later!");
+            } finally {
+                loader.classList.add('hidden-elem');
+            }
+        }
+
+        // Exponential Backoff Implementation as requested
+        async function fetchWithRetry(url, options, retries = 5) {
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            for (let i = 0; i <= retries; i++) {
+                try {
+                    const res = await fetch(url, options);
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    const data = await res.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text || "I'm not sure how to answer that based on the current data.";
+                } catch (error) {
+                    if (i === retries) throw error;
+                    await new Promise(r => setTimeout(r, delays[i]));
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -3,6 +3,7 @@
 // ═══════════════════════════════════════════════
 
 let gameXpTotal = 0;
+let externalGameStartTime = 0;
 
 function launchGame(gameId) {
   const modal = document.getElementById('minigame-modal');
@@ -17,10 +18,48 @@ function launchGame(gameId) {
   else if (gameId === 'circuitbuilder') initCircuitBuilder(content);
   else if (gameId === 'mathkingdom') initMathKingdom(content);
   else if (gameId === 'escaperoom') initEquationEscapeRoom(content);
+  else if (gameId === 'biology_cells') launchExternalGame('Biology Cells Game.html', 'Biology Cells Game', content);
+  else if (gameId === 'physics_electric') launchExternalGame('Physics Electric Game.html', 'Physics Electric Game', content);
+  else if (gameId === 'chemistry_beaker') launchExternalGame('Chemistry Beaker Game.html', 'Chemistry Beaker Game', content);
+  else if (gameId === 'math_graphs') launchExternalGame('Mathematics Graphs Game.html', 'Mathematics Graphs Game', content);
+  else if (gameId === 'computer_code') launchExternalGame('Computer Code Game.html', 'Computer Code Game', content);
+}
+
+function launchExternalGame(filename, title, container) {
+  externalGameStartTime = Date.now();
+  container.style.maxWidth = '900px';
+  container.style.height = '85vh';
+  container.style.display = 'flex';
+  container.style.flexDirection = 'column';
+  container.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-shrink:0;">
+      <h3 style="font-family:'Baloo 2', cursive; font-size:1.35rem; margin:0; color:var(--primary);">${title}</h3>
+      <button onclick="closeGame()" style="background:none; border:none; color:var(--text3); font-size:1.6rem; cursor:pointer; line-height:1;">✕</button>
+    </div>
+    <iframe src="/games/${filename}" style="flex:1; width:100%; border:none; border-radius:12px; background:#fff;"></iframe>
+  `;
 }
 
 async function closeGame() {
   document.getElementById('minigame-modal').style.display = 'none';
+  const content = document.getElementById('game-modal-content');
+  if (content) {
+    content.style.maxWidth = '';
+    content.style.height = '';
+    content.style.display = '';
+    content.style.flexDirection = '';
+    content.innerHTML = '';
+  }
+
+  // Award flat 15 XP if they played the external game for at least 10 seconds
+  if (externalGameStartTime > 0) {
+    const playDuration = (Date.now() - externalGameStartTime) / 1000;
+    if (playDuration >= 10) {
+      gameXpTotal += 15;
+    }
+    externalGameStartTime = 0;
+  }
+
   if (gameXpTotal > 0) {
     if (typeof currentUser !== 'undefined' && currentUser) {
       try {

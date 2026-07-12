@@ -58,6 +58,12 @@ app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '../frontend')));
 
+// Serve PhET offline simulation folders statically
+app.use('/labs/biology', express.static(path.join(__dirname, '../Biology Phet Labs')));
+app.use('/labs/chemistry', express.static(path.join(__dirname, '../Chemistry Phet Labs')));
+app.use('/labs/maths', express.static(path.join(__dirname, '../Maths Phet Labs')));
+app.use('/labs/physics', express.static(path.join(__dirname, '../Physics Phet Labs')));
+
 const db = new Database(path.join(__dirname, '../database/stem_platform.db'));
 
 db.exec(`
@@ -122,13 +128,19 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id),
     FOREIGN KEY (lesson_id) REFERENCES lessons(id)
   );
+  CREATE TABLE IF NOT EXISTS user_lab_clicks (
+    user_id INTEGER,
+    lab_code TEXT,
+    clicked_at TEXT DEFAULT (datetime('now'))
+  );
   CREATE TABLE IF NOT EXISTS badges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     icon TEXT,
     description TEXT,
     requirement TEXT,
-    xp_threshold INTEGER DEFAULT 0
+    xp_threshold INTEGER DEFAULT 0,
+    xp_reward INTEGER DEFAULT 100
   );
   CREATE TABLE IF NOT EXISTS user_badges (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -378,6 +390,35 @@ function validatePassword(password) {
 
 // ===== SEED DATA =====
 function seedData() {
+  // Ensure xp_reward column exists
+  try {
+    db.exec("ALTER TABLE badges ADD COLUMN xp_reward INTEGER DEFAULT 100");
+  } catch (e) {
+    // Already exists
+  }
+
+  // Clear existing badges definition to rebuild cleanly with correct IDs and rewards
+  // IMPORTANT: Must delete child table (user_badges) BEFORE parent (badges) to avoid FK violation
+  db.exec("DELETE FROM user_badges");
+  db.exec("DELETE FROM sqlite_sequence WHERE name='user_badges'");
+  db.exec("DELETE FROM badges");
+  db.exec("DELETE FROM sqlite_sequence WHERE name='badges'");
+
+  const insertBadge = db.prepare('INSERT INTO badges (name, icon, description, requirement, xp_threshold, xp_reward) VALUES (?, ?, ?, ?, ?, ?)');
+  insertBadge.run('First Step','🌱','Completed your first lesson!','Complete 1 lesson',0, 100);
+  insertBadge.run('Explorer','🗺️','Completed 5 lessons!','Complete 5 lessons',250, 150);
+  insertBadge.run('Scholar','📚','Reached 500 XP!','Earn 500 XP',500, 200);
+  insertBadge.run('Champion','🏆','Reached 1000 XP!','Earn 1000 XP',1000, 300);
+  insertBadge.run('STEM Star','⭐','Completed lessons in all 4 subjects!','All subjects explored',400, 250);
+  insertBadge.run('Quiz Master','🎯','Got perfect score in a quiz!','Score 100% in a quiz',0, 150);
+  insertBadge.run('Pacesetter','🏁','Completed a lesson in record time!','Speedy Learner',0, 150);
+  insertBadge.run('Persistence','🛡️','Attempted the same quiz 3 or more times!','Never Give Up',0, 150);
+  insertBadge.run('Lab Assistant','🧪','Completed 3 or more PhET simulations!','Simulation Explorer',0, 200);
+  insertBadge.run('Offline Hero','💾','Learned completely offline using cached data!','Offline learning champion',0, 200);
+  insertBadge.run('Streak Champ','🔥','Achieved a daily login streak of 5 days!','5-Day Streak',0, 300);
+  insertBadge.run('Quiz Battler','⚔️','Participated in a live quiz battle!','Battle Competitor',0, 250);
+  insertBadge.run('Team Player','👥','Joined a collaborative study group!','Study group member',0, 250);
+
   const subjectCount = db.prepare('SELECT COUNT(*) as c FROM subjects').get().c;
   if (subjectCount > 0) return;
 
@@ -435,13 +476,7 @@ function seedData() {
   insertQ.run(17,'The Golden Gate is what type of bridge?','गोल्डन गेट किस प्रकार का पुल है?','Beam','Arch','Suspension','Truss','C','It is a suspension bridge held up by cables.',10);
 
 
-  const insertBadge = db.prepare('INSERT INTO badges (name, icon, description, requirement, xp_threshold) VALUES (?, ?, ?, ?, ?)');
-  insertBadge.run('First Step','🌱','Completed your first lesson!','Complete 1 lesson',0);
-  insertBadge.run('Explorer','🗺️','Completed 5 lessons!','Complete 5 lessons',250);
-  insertBadge.run('Scholar','📚','Reached 500 XP!','Earn 500 XP',500);
-  insertBadge.run('Champion','🏆','Reached 1000 XP!','Earn 1000 XP',1000);
-  insertBadge.run('STEM Star','⭐','Completed lessons in all 4 subjects!','All subjects explored',400);
-  insertBadge.run('Quiz Master','🎯','Got perfect score in a quiz!','Score 100% in a quiz',0);
+
 
   // Demo student
   const studentPw = bcrypt.hashSync('Demo@123', 10);
@@ -848,11 +883,65 @@ app.get('/api/dashboard', auth, (req, res) => {
         ORDER BY ub.earned_at DESC LIMIT 4
     `).all(req.user.id);
 
+    // 5. Study completion percentage & subject progress
+    const totalLessons = db.prepare('SELECT COUNT(*) as c FROM lessons').get().c || 1;
+    const completedLessons = db.prepare('SELECT COUNT(DISTINCT lesson_id) as c FROM user_progress WHERE user_id = ? AND completed = 1').get(req.user.id).c || 0;
+    const studyCompletionPct = Math.round((completedLessons / totalLessons) * 100);
+
+    const subjectProgress = db.prepare(`
+        SELECT s.name, s.icon, s.color,
+          COUNT(DISTINCT l.id) as total_lessons,
+          COUNT(DISTINCT CASE WHEN up.completed = 1 THEN l.id END) as completed_lessons
+        FROM subjects s
+        LEFT JOIN lessons l ON l.subject_id = s.id
+        LEFT JOIN user_progress up ON up.lesson_id = l.id AND up.user_id = ?
+        GROUP BY s.id
+    `).all(req.user.id);
+
+    // 6. Student focus efficiency
+    const focusRow = db.prepare(`
+        SELECT AVG(focus_seconds) as avg_focus, AVG(distracted_seconds) as avg_distracted
+        FROM focus_sessions
+        WHERE user_id = ?
+    `).get(req.user.id);
+    let focusPct = 67;
+    if (focusRow && (focusRow.avg_focus || focusRow.avg_distracted)) {
+      const f = focusRow.avg_focus || 0;
+      const d = focusRow.avg_distracted || 0;
+      if (f + d > 0) {
+        focusPct = Math.round((f / (f + d)) * 100);
+      }
+    }
+
+    // 7. Simulated Teacher feedbacks based on actual student progress
+    const teacherFeedbacks = [
+      {
+        teacher: "Teacher Sarah",
+        avatar: "👩‍🏫",
+        message: completedLessons > 0 
+          ? `Great job on completing ${completedLessons} lessons! Keep up the energetic work.` 
+          : "Welcome to VidyaQuest! Looking forward to seeing your first lesson submissions.",
+        date: new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })
+      },
+      {
+        teacher: "Teacher Ravi",
+        avatar: "👨‍🏫",
+        message: focusPct >= 70 
+          ? `Excellent focus score of ${focusPct}% today! Your study discipline is improving.`
+          : "Keep attempting quiz battles to earn extra XP and boost your class rank.",
+        date: "12 Sep 2026"
+      }
+    ];
+
     res.json({
         weeklyXp: weeklyXpData,
         recentLessons,
         upcomingTasks,
-        recentBadges
+        recentBadges,
+        studyCompletionPct,
+        subjectProgress,
+        focusPct,
+        teacherFeedbacks
     });
 });
 
@@ -1071,6 +1160,81 @@ app.get('/api/lesson/:id', auth, (req, res) => {
   });
 });
 
+function checkAndAwardBadges(userId) {
+  const u = db.prepare('SELECT xp, streak FROM users WHERE id = ?').get(userId);
+  if (!u) return [];
+
+  const compCount = db.prepare('SELECT COUNT(*) as c FROM user_progress WHERE user_id = ? AND completed = 1').get(userId).c;
+  
+  const distinctSubs = db.prepare(`
+    SELECT COUNT(DISTINCT l.subject_id) as c
+    FROM user_progress up
+    JOIN lessons l ON up.lesson_id = l.id
+    WHERE up.user_id = ? AND up.completed = 1
+  `).get(userId).c;
+
+  const inGrp = db.prepare('SELECT id FROM study_group_members WHERE user_id = ?').get(userId);
+  const labClicks = db.prepare('SELECT COUNT(DISTINCT lab_code) as c FROM user_lab_clicks WHERE user_id = ?').get(userId).c;
+
+  const earnedBadges = [];
+  const dateS = new Date().toISOString().split('T')[0];
+
+  function awardG(badgeId) {
+    const already = db.prepare('SELECT id FROM user_badges WHERE user_id = ? AND badge_id = ?').get(userId, badgeId);
+    if (!already) {
+      db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(userId, badgeId);
+      const b = db.prepare('SELECT * FROM badges WHERE id = ?').get(badgeId);
+      if (b) {
+        earnedBadges.push(b);
+        const xpReward = b.xp_reward || 100;
+        db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpReward, userId);
+        db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(userId);
+        db.prepare('UPDATE leaderboard SET total_xp = total_xp + ? WHERE user_id = ?').run(xpReward, userId);
+        
+        const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(userId, dateS);
+        if (existingDaily) {
+          db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpReward, existingDaily.id);
+        } else {
+          db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(userId, dateS, xpReward);
+        }
+      }
+    }
+  }
+
+  if (compCount >= 1) awardG(1);
+  if (compCount >= 5) awardG(2);
+  if (u.xp >= 500) awardG(3);
+  if (u.xp >= 1000) awardG(4);
+  if (distinctSubs >= 4) awardG(5);
+  if (labClicks >= 3) awardG(9);
+  if (u.streak >= 5) awardG(11);
+  if (inGrp) awardG(13);
+
+  return earnedBadges;
+}
+
+function awardBadgeDirect(userId, badgeId) {
+  const already = db.prepare('SELECT id FROM user_badges WHERE user_id = ? AND badge_id = ?').get(userId, badgeId);
+  if (!already) {
+    db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(userId, badgeId);
+    const b = db.prepare('SELECT * FROM badges WHERE id = ?').get(badgeId);
+    if (b) {
+      const xpReward = b.xp_reward || 100;
+      db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpReward, userId);
+      db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(userId);
+      db.prepare('UPDATE leaderboard SET total_xp = total_xp + ? WHERE user_id = ?').run(xpReward, userId);
+      
+      const dateS = new Date().toISOString().split('T')[0];
+      const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(userId, dateS);
+      if (existingDaily) {
+        db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpReward, existingDaily.id);
+      } else {
+        db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(userId, dateS, xpReward);
+      }
+    }
+  }
+}
+
 // ===== QUIZ =====
 app.post('/api/quiz/submit', auth, (req, res) => {
   const { lesson_id, score, total, responses } = req.body;
@@ -1148,17 +1312,40 @@ app.post('/api/quiz/submit', auth, (req, res) => {
 
   // Badges
   const user = db.prepare('SELECT xp FROM users WHERE id = ?').get(req.user.id);
-  const completedCount = db.prepare('SELECT COUNT(*) as c FROM user_progress WHERE user_id = ? AND completed = 1').get(req.user.id).c;
   const newBadges = [];
   function awardBadge(badgeId) {
     const already = db.prepare('SELECT id FROM user_badges WHERE user_id = ? AND badge_id = ?').get(req.user.id, badgeId);
-    if (!already) { db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(req.user.id, badgeId); const b = db.prepare('SELECT * FROM badges WHERE id = ?').get(badgeId); newBadges.push(b); }
+    if (!already) {
+      db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(req.user.id, badgeId);
+      const b = db.prepare('SELECT * FROM badges WHERE id = ?').get(badgeId);
+      if (b) {
+        newBadges.push(b);
+        const xpReward = b.xp_reward || 100;
+        db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpReward, req.user.id);
+        db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(req.user.id);
+        db.prepare('UPDATE leaderboard SET total_xp = total_xp + ? WHERE user_id = ?').run(xpReward, req.user.id);
+        
+        const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(req.user.id, dateStr);
+        if (existingDaily) {
+          db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpReward, existingDaily.id);
+        } else {
+          db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(req.user.id, dateStr, xpReward);
+        }
+      }
+    }
   }
-  if (completedCount >= 1) awardBadge(1);
-  if (completedCount >= 5) awardBadge(2);
-  if (user.xp >= 500) awardBadge(3);
-  if (user.xp >= 1000) awardBadge(4);
+
+  // Call general badges check
+  const generalBadges = checkAndAwardBadges(req.user.id);
+  newBadges.push(...generalBadges);
+
+  // Evaluate quiz-specific badges
   if (percentage === 100) awardBadge(6);
+  const duration = req.body.duration || 999;
+  if (percentage === 100 && duration < 60) awardBadge(7);
+  const attemptsCount = existing ? (existing.attempts + 1) : 1;
+  if (percentage >= 70 && attemptsCount >= 3) awardBadge(8);
+  if (req.body.is_offline) awardBadge(10);
 
   // Group challenge progress hook: emit socket event if user is in a group
   try {
@@ -1184,6 +1371,43 @@ app.get('/api/badges', auth, (req, res) => {
   const all = db.prepare('SELECT * FROM badges').all();
   const earned = db.prepare('SELECT badge_id FROM user_badges WHERE user_id = ?').all(req.user.id).map(b => b.badge_id);
   res.json(all.map(b => ({ ...b, earned: earned.includes(b.id) })));
+});
+
+app.post('/api/labs/track', auth, (req, res) => {
+  const { lab_code } = req.body;
+  if (!lab_code) return res.status(400).json({ error: 'Missing lab_code' });
+
+  db.prepare('INSERT INTO user_lab_clicks (user_id, lab_code) VALUES (?, ?)').run(req.user.id, lab_code);
+  const clickCount = db.prepare('SELECT COUNT(DISTINCT lab_code) as c FROM user_lab_clicks WHERE user_id = ?').get(req.user.id).c;
+  
+  const newBadges = [];
+  const dateStr = new Date().toISOString().split('T')[0];
+  function awardBadge(badgeId) {
+    const already = db.prepare('SELECT id FROM user_badges WHERE user_id = ? AND badge_id = ?').get(req.user.id, badgeId);
+    if (!already) {
+      db.prepare('INSERT INTO user_badges (user_id, badge_id) VALUES (?, ?)').run(req.user.id, badgeId);
+      const b = db.prepare('SELECT * FROM badges WHERE id = ?').get(badgeId);
+      newBadges.push(b);
+      
+      const xpReward = b.xp_reward || 100;
+      db.prepare('UPDATE users SET xp = xp + ? WHERE id = ?').run(xpReward, req.user.id);
+      db.prepare('UPDATE users SET level = MAX(1, xp / 200 + 1) WHERE id = ?').run(req.user.id);
+      db.prepare('UPDATE leaderboard SET total_xp = total_xp + ? WHERE user_id = ?').run(xpReward, req.user.id);
+      
+      const existingDaily = db.prepare('SELECT id FROM daily_xp WHERE user_id = ? AND date = ?').get(req.user.id, dateStr);
+      if (existingDaily) {
+        db.prepare('UPDATE daily_xp SET xp_earned = xp_earned + ? WHERE id = ?').run(xpReward, existingDaily.id);
+      } else {
+        db.prepare('INSERT INTO daily_xp (user_id, date, xp_earned) VALUES (?, ?, ?)').run(req.user.id, dateStr, xpReward);
+      }
+    }
+  }
+
+  if (clickCount >= 3) {
+    awardBadge(9);
+  }
+
+  res.json({ success: true, clickCount, newBadges });
 });
 
 app.post('/api/check-password', (req, res) => {
@@ -1397,6 +1621,9 @@ app.post('/api/groups/create', auth, requireRole('student'), (req, res) => {
       VALUES (?, ?)
     `).run(groupId, req.user.id);
 
+    // Award Team Player badge (badge ID 13)
+    awardBadgeDirect(req.user.id, 13);
+
     res.json({ success: true, groupId });
   } catch (err) {
     console.error('[CreateGroup] Error:', err);
@@ -1444,6 +1671,9 @@ app.post('/api/groups/join', auth, requireRole('student'), (req, res) => {
       INSERT INTO study_group_members (group_id, user_id)
       VALUES (?, ?)
     `).run(group_id, req.user.id);
+
+    // Award Team Player badge (badge ID 13)
+    awardBadgeDirect(req.user.id, 13);
 
     res.json({ success: true });
   } catch (err) {
@@ -1889,7 +2119,7 @@ app.post('/api/scan-solve', auth, async (req, res) => {
     return res.status(500).json({ error: 'AI Vision is currently unavailable (API key missing)' });
   }
 
-  const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi', or: 'Odia' };
+  const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi', te: 'Telugu', or: 'Odia' };
   const targetLanguage = langMap[language] || 'English';
 
   // Strip data URL prefix if present, keep just base64
@@ -1899,45 +2129,69 @@ app.post('/api/scan-solve', auth, async (req, res) => {
 
   const systemPrompt = `You are VidyaQuest's expert STEM tutor for rural Indian school students (Grades 6–12).
 A student has photographed a STEM problem from their textbook or handwritten notes.
-Your job is to solve it completely and explain every step so the student truly understands.
+Your job is to: (1) read the problem EXACTLY as written, (2) solve it step-by-step with full arithmetic/algebra work shown, and (3) explain each step clearly.
+
+CRITICAL RULES — violating any of these is a failure:
+- NEVER write "MATH_INLINE_PLACEHOLDER" or any placeholder text. Always write the actual math expression.
+- NEVER skip arithmetic steps. Show every calculation explicitly.
+- ALWAYS compute numerically: if the problem has numbers, give the numeric answer.
+- ALL math expressions MUST use LaTeX/KaTeX delimiters — never write bare equations.
+- The solution MUST be mathematically correct. Double-check your arithmetic before responding.
 
 FORMATTING RULES (follow exactly):
 1. Respond ONLY in ${targetLanguage}.
-2. Start with a ## heading that names the topic (e.g. "## ⚛️ Newton's Second Law" or "## 🔢 Linear Equations").
-3. Directly below, write one sentence summarising what the problem is asking.
-4. Then write a ### Step-by-Step Solution section. Number every step clearly.
-5. ALL mathematical expressions MUST be wrapped in KaTeX/LaTeX delimiters:
-   - Inline expressions: $expression$ (e.g. $F = ma$, $x = 5$)
-   - Display (block) equations: $$expression$$ on its own line (e.g. $$\\frac{a+b}{c} = d$$)
-   - Never write bare equations without delimiters.
-6. After the solution, add a ### ✅ Final Answer section that states the answer clearly in a single line.
-7. End with a ### 💡 Key Takeaway section — one memorable tip or concept the student should remember.
-8. Use bullet points and numbered lists where helpful.
-9. Use emojis sparingly to make it engaging (e.g. ⚠️ for warnings, ✅ for correct steps, 💡 for tips).
-10. Keep language simple, warm, and encouraging — like a friendly senior student explaining to a junior.
-11. If the image is unclear or unreadable, respond only with: "📸 The image is a bit blurry! Please retake the photo in good lighting, holding the camera steady and close to the problem."
+2. Start with a ## heading naming the topic (e.g. "## 🔢 Simplifying Fractions" or "## ⚛️ Newton's Laws").
+3. Write one sentence summarising exactly what the problem asks.
+4. Write a ### Step-by-Step Solution section. Number every step. Show full working.
+5. LaTeX math rules:
+   - Inline expressions: wrap in single dollar signs → $F = ma$, $x = 5$, $\\frac{1}{2}$
+   - Block/display equations: wrap in double dollar signs on their own line → $$\\frac{a+b}{c} = d$$
+   - Use \\frac{}{} for fractions, \\times for multiplication, \\cdot for dot product.
+   - NEVER leave any math expression outside of dollar-sign delimiters.
+6. After the solution, add a ### ✅ Final Answer section — state the answer on one line with the value in LaTeX.
+7. End with a ### 💡 Key Takeaway — one tip the student should remember.
+8. Keep language simple, warm, and encouraging.
+9. If the image is unreadable, respond only with: "📸 The image is a bit blurry! Please retake the photo in good lighting."
 
-EXAMPLE STRUCTURE:
-## 📐 Area of a Triangle
+EXAMPLE OF CORRECT OUTPUT (for problem: [(8+(-9))/(-9-8)] × [(72+(-64))/(3-8)]):
 
-The problem asks us to find the area of a triangle with base 8 cm and height 5 cm.
+## 🔢 Simplifying a Product of Fractions
+
+The problem asks us to evaluate the product of two fractions where each bracket simplifies to a simpler fraction.
 
 ### Step-by-Step Solution
 
-**Step 1: Write down the formula**
-$$\\text{Area} = \\frac{1}{2} \\times \\text{base} \\times \\text{height}$$
+**Step 1: Simplify the numerator and denominator of the first fraction**
 
-**Step 2: Substitute the values**
-$$\\text{Area} = \\frac{1}{2} \\times 8 \\times 5$$
+Numerator: $$8 + (-9) = 8 - 9 = -1$$
+Denominator: $$-9 - 8 = -17$$
 
-**Step 3: Calculate**
-$$\\text{Area} = \\frac{40}{2} = 20 \\text{ cm}^2$$
+So the first fraction is:
+$$\\frac{-1}{-17} = \\frac{1}{17}$$
+
+(Two negatives cancel to give a positive!)
+
+**Step 2: Simplify the numerator and denominator of the second fraction**
+
+Numerator: $$72 + (-64) = 72 - 64 = 8$$
+Denominator: $$3 - 8 = -5$$
+
+So the second fraction is:
+$$\\frac{8}{-5} = -\\frac{8}{5}$$
+
+**Step 3: Multiply the two simplified fractions**
+
+$$\\frac{1}{17} \\times \\left(-\\frac{8}{5}\\right) = -\\frac{1 \\times 8}{17 \\times 5} = -\\frac{8}{85}$$
 
 ### ✅ Final Answer
-The area of the triangle is $20 \\text{ cm}^2$.
+
+$$-\\dfrac{8}{85}$$
+
+The correct answer is **[A]** $-\\dfrac{8}{85}$.
 
 ### 💡 Key Takeaway
-Always divide by 2 when finding the area of a triangle — this is because a triangle is exactly half of a rectangle with the same base and height!`;
+
+Always simplify each bracket first before multiplying. A negative divided by a negative gives a positive!`;
 
   try {
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -1961,12 +2215,12 @@ Always divide by 2 when finding the area of a triangle — this is because a tri
               },
               {
                 type: 'text',
-                text: 'Please solve this STEM problem step by step.'
+                text: 'Read this image carefully and solve the STEM problem shown. Show all working step by step with correct arithmetic. Use LaTeX math notation.'
               }
             ]
           }
         ],
-        temperature: 0.2,
+        temperature: 0.1,
         max_tokens: 2048
       })
     });
@@ -1984,6 +2238,8 @@ Always divide by 2 when finding the area of a triangle — this is because a tri
     res.status(500).json({ error: 'Could not analyse the image. Please try again with a clearer photo.' });
   }
 });
+
+
 
 // ===== EMOTION & ENGAGEMENT TRACKER API =====
 app.post('/api/emotion/analyze', auth, async (req, res) => {
@@ -2684,10 +2940,12 @@ function endBattle(roomCode) {
     loserId = p1.id;
   }
 
-  // Award XP to users in the database
+  // Award XP and achievements to users in the database
   try {
     awardXP(p1.id, p1XP);
     awardXP(p2.id, p2XP);
+    awardBadgeDirect(p1.id, 12);
+    awardBadgeDirect(p2.id, 12);
   } catch (err) {
     console.error('Error awarding XP after battle:', err);
   }

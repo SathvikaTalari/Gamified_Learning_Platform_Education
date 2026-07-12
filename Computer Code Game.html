@@ -1,0 +1,1747 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduOS Virtual Computer Lab</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom style overrides for ultra premium Glassmorphic OS look */
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        .glass-window {
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+        }
+
+        /* Simple custom animations */
+        @keyframes pulse-glow {
+
+            0%,
+            100% {
+                opacity: 0.6;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.05);
+            }
+        }
+
+        .glow-orb {
+            animation: pulse-glow 8s infinite ease-in-out;
+        }
+
+        /* Hidden utility */
+        .hidden {
+            display: none !important;
+        }
+    </style>
+</head>
+
+<body
+    class="min-h-screen bg-[conic-gradient(at_top_right,_var(--tw-gradient-stops))] from-indigo-900 via-slate-900 to-purple-900 text-slate-100 flex flex-col font-sans relative overflow-hidden select-none">
+
+    <!-- Decorative Glowing Cosmic Orbs in Background -->
+    <div
+        class="glow-orb absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/20 rounded-full blur-3xl pointer-events-none mix-blend-screen">
+    </div>
+    <div class="glow-orb absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-500/20 rounded-full blur-3xl pointer-events-none mix-blend-screen"
+        style="animation-delay: 4s;"></div>
+
+    <!-- --- TOP DESKTOP HEADER BAR --- -->
+    <header
+        class="bg-black/20 backdrop-blur-lg border-b border-white/10 px-6 py-2.5 flex items-center justify-between z-30">
+        <div class="flex items-center gap-3">
+            <div
+                class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center text-white text-lg shadow-lg border border-white/20">
+                🤖
+            </div>
+            <h1 class="text-sm font-black uppercase tracking-widest text-white font-mono drop-shadow-md">
+                EduOS <span class="text-indigo-300 font-medium">Workspace</span>
+            </h1>
+        </div>
+
+        <!-- OS Headers (Badge count, Clock, Help) -->
+        <div class="flex items-center gap-4">
+            <div
+                class="flex items-center gap-2 bg-black/30 border border-white/10 px-3 py-1.5 rounded-full text-yellow-300 shadow-inner">
+                <!-- SVG Award Icon -->
+                <svg class="w-4 h-4 text-yellow-400 animate-bounce" fill="none" stroke="currentColor"
+                    viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+                </svg>
+                <span class="text-xs font-black tracking-wider"><span id="badge-count">0</span> BADGES</span>
+            </div>
+            <div class="flex items-center gap-1.5 text-xs font-bold text-white/70">
+                <!-- SVG Clock Icon -->
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span id="os-clock">--:-- --</span>
+            </div>
+            <button onclick="toggleWelcomeModal(true)"
+                class="text-white/60 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-full">
+                <!-- SVG Help Icon -->
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                        d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </button>
+        </div>
+    </header>
+
+    <!-- --- MAIN DESKTOP OS FLOOR --- -->
+    <main class="flex-1 p-8 relative flex flex-col justify-between">
+
+        <!-- GRID OF DESKTOP ICON LAUNCHERS -->
+        <div
+            class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-8 max-w-6xl mx-auto w-full pt-4 z-10">
+
+            <!-- Launch Terminal Quest -->
+            <button onclick="launchApp('terminal')" class="flex flex-col items-center group relative outline-none">
+                <div id="icon-terminal"
+                    class="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:scale-105 group-hover:-translate-y-2 shadow-xl border border-white/20 bg-gradient-to-br from-slate-700 to-slate-900">
+                    <svg class="w-10 h-10 text-white drop-shadow-md" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <div id="check-terminal"
+                        class="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-lg hidden">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-bold text-white drop-shadow-md tracking-wide px-2 py-1 rounded bg-black/20 group-hover:bg-indigo-500/50 transition-colors">Terminal
+                    Quest</span>
+            </button>
+
+            <!-- Launch Logic Gates -->
+            <button onclick="launchApp('logic')" class="flex flex-col items-center group relative outline-none">
+                <div id="icon-logic"
+                    class="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:scale-105 group-hover:-translate-y-2 shadow-xl border border-white/20 bg-gradient-to-br from-orange-400 to-red-500">
+                    <svg class="w-10 h-10 text-white drop-shadow-md" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                    <div id="check-logic" class="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-lg hidden">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-bold text-white drop-shadow-md tracking-wide px-2 py-1 rounded bg-black/20 group-hover:bg-indigo-500/50 transition-colors">Logic
+                    Circuits</span>
+            </button>
+
+            <!-- Launch Turtle Painter -->
+            <button onclick="launchApp('turtle')" class="flex flex-col items-center group relative outline-none">
+                <div id="icon-turtle"
+                    class="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:scale-105 group-hover:-translate-y-2 shadow-xl border border-white/20 bg-gradient-to-br from-blue-400 to-indigo-600">
+                    <svg class="w-10 h-10 text-white drop-shadow-md" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                    <div id="check-turtle" class="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-lg hidden">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-bold text-white drop-shadow-md tracking-wide px-2 py-1 rounded bg-black/20 group-hover:bg-indigo-500/50 transition-colors">Turtle
+                    Painter</span>
+            </button>
+
+            <!-- Launch PC Builder -->
+            <button onclick="launchApp('assembler')" class="flex flex-col items-center group relative outline-none">
+                <div id="icon-assembler"
+                    class="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:scale-105 group-hover:-translate-y-2 shadow-xl border border-white/20 bg-gradient-to-br from-pink-400 to-rose-600">
+                    <svg class="w-10 h-10 text-white drop-shadow-md" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                    <div id="check-assembler"
+                        class="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-lg hidden">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-bold text-white drop-shadow-md tracking-wide px-2 py-1 rounded bg-black/20 group-hover:bg-indigo-500/50 transition-colors">PC
+                    Builder</span>
+            </button>
+
+            <!-- Launch Network Router -->
+            <button onclick="launchApp('network')" class="flex flex-col items-center group relative outline-none">
+                <div id="icon-network"
+                    class="w-20 h-20 rounded-3xl flex items-center justify-center mb-3 transition-all duration-300 transform group-hover:scale-105 group-hover:-translate-y-2 shadow-xl border border-white/20 bg-gradient-to-br from-cyan-400 to-blue-500">
+                    <svg class="w-10 h-10 text-white drop-shadow-md" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                    </svg>
+                    <div id="check-network" class="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-lg hidden">
+                        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                </div>
+                <span
+                    class="text-xs font-bold text-white drop-shadow-md tracking-wide px-2 py-1 rounded bg-black/20 group-hover:bg-indigo-500/50 transition-colors">Net
+                    Router</span>
+            </button>
+
+        </div>
+
+        <!-- GLOBAL SYSTEMS NOTIFICATIONS OVERLAY -->
+        <div id="achievement-alert"
+            class="absolute top-10 left-1/2 transform -translate-x-1/2 max-w-sm w-full bg-white/10 backdrop-blur-xl border border-white/30 p-4 rounded-2xl shadow-2xl flex gap-4 items-start z-50 hidden animate-in slide-in-from-top-10 fade-in duration-300">
+            <div class="bg-white/20 p-2.5 rounded-xl text-white shadow-inner text-xl">
+                🏆
+            </div>
+            <div class="flex-1">
+                <h3 class="text-sm font-black text-white">Awesome Job!</h3>
+                <p id="achievement-msg" class="text-xs text-white/80 mt-1 font-medium leading-relaxed">You earned a new
+                    lab badge!</p>
+            </div>
+            <button onclick="dismissAlert()"
+                class="text-white/50 hover:text-white bg-black/20 hover:bg-black/40 rounded-full p-1 transition-colors">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+
+        <!-- INSTRUCTIONS BAR -->
+        <div
+            class="text-center text-[11px] text-slate-500 z-10 max-w-md mx-auto leading-relaxed bg-slate-900/40 p-2.5 rounded-xl border border-slate-850">
+            💡 <strong>Tip:</strong> Click on any app icon above to launch its educational lab session!
+        </div>
+
+        <!-- MINIMIZED TASKBAR DOCK -->
+        <div id="dock-bar"
+            class="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-white/10 backdrop-blur-xl p-2 rounded-3xl border border-white/20 flex gap-2 shadow-2xl z-30 hidden animate-in slide-in-from-bottom-8">
+            <!-- Generated Dynamically via JS -->
+        </div>
+    </main>
+
+    <!-- ==================== WORKSTATION WINDOWS ==================== -->
+
+    <!-- TERMINAL WINDOW -->
+    <div id="window-terminal"
+        class="absolute inset-4 md:inset-8 lg:inset-12 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl flex flex-col z-40 hidden overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center justify-between select-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-indigo-500/50 shadow-inner animate-pulse"></div>
+                <span class="text-xs font-black tracking-widest text-white uppercase opacity-80">💻 Terminal
+                    Quest</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Minimize Button -->
+                <button onclick="minimizeApp('terminal')"
+                    class="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Minimize">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <!-- Close Button -->
+                <button onclick="closeApp('terminal')"
+                    class="text-white/60 hover:text-red-400 p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 flex flex-col bg-[#1e1e1e] font-mono text-sm overflow-hidden">
+            <!-- Mascot Guidance -->
+            <div class="bg-slate-900 p-4 border-b border-white/10 flex items-center gap-4 text-white">
+                <div class="text-4xl animate-bounce">🤖</div>
+                <div class="text-xs">
+                    <div class="font-bold text-indigo-300 uppercase">Robo-Byte Guidance:</div>
+                    <p id="terminal-guide-text">Let's start! Type "ls" and hit Enter to inspect the virtual folder
+                        contents!</p>
+                </div>
+            </div>
+            <!-- Output Board -->
+            <div id="terminal-history" class="p-4 flex-1 overflow-y-auto space-y-1.5 select-text text-slate-300">
+                <div class="text-emerald-400 font-bold">✨ Welcome to Terminal Quest! ✨</div>
+                <div class="text-indigo-300">You can use real Linux commands: pwd, date, whoami, mkdir, touch, echo, rm,
+                    ls, cd, cat.</div>
+                <div class="text-amber-400">Type "guide" to see your quest objective!</div>
+            </div>
+            <!-- Command Chips -->
+            <div class="bg-[#252526] p-3 border-t border-[#3d3d3d]">
+                <div class="text-[10px] text-[#858585] mb-2 font-bold uppercase">🛠️ Quick Commands:</div>
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="loadTerminalInput('ls')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">ls</button>
+                    <button onclick="loadTerminalInput('cd secret_vault')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">cd
+                        secret_vault</button>
+                    <button onclick="loadTerminalInput('cat .hidden_treasure.key')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">cat
+                        .hidden_treasure.key</button>
+                    <button onclick="loadTerminalInput('pwd')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">pwd</button>
+                    <button onclick="loadTerminalInput('date')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">date</button>
+                    <button onclick="loadTerminalInput('whoami')"
+                        class="bg-[#333333] hover:bg-[#444444] text-[#cccccc] text-[11px] px-3 py-1.5 rounded-full border border-[#444444]">whoami</button>
+                </div>
+            </div>
+            <!-- Command Input -->
+            <div class="bg-[#1e1e1e] p-3 flex items-center border-t border-[#3d3d3d]">
+                <span class="text-[#98c379] font-bold">student@edu-os</span>
+                <span class="text-[#abb2bf]">:<span id="terminal-path">/</span>$ </span>
+                <input id="terminal-input" type="text"
+                    class="flex-1 bg-transparent border-none outline-none text-[#abb2bf] font-mono focus:ring-0 ml-2"
+                    spellcheck="false" autocomplete="off" />
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC CIRCUITS WINDOW -->
+    <div id="window-logic"
+        class="absolute inset-4 md:inset-8 lg:inset-12 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl flex flex-col z-40 hidden overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center justify-between select-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-indigo-500/50 shadow-inner animate-pulse"></div>
+                <span class="text-xs font-black tracking-widest text-white uppercase opacity-80">🔌 Logic
+                    Circuits</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Minimize Button -->
+                <button onclick="minimizeApp('logic')"
+                    class="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Minimize">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <!-- Close Button -->
+                <button onclick="closeApp('logic')"
+                    class="text-white/60 hover:text-red-400 p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 flex flex-col lg:flex-row bg-slate-900 text-white overflow-hidden">
+            <!-- Sidebar -->
+            <div
+                class="lg:w-80 bg-slate-950/80 p-5 border-r border-white/10 flex flex-col justify-between overflow-y-auto">
+                <div class="space-y-4">
+                    <div class="bg-white/10 border border-white/20 rounded-2xl p-3 flex gap-3 items-center">
+                        <span class="text-3xl">🤖</span>
+                        <div class="text-xs text-slate-200">
+                            <strong class="text-indigo-400 uppercase tracking-wide block">Robo-Byte:</strong> Connect
+                            inputs so they are DIFFERENT, choose the XOR gate, and verify!
+                        </div>
+                    </div>
+                    <div class="p-4 bg-indigo-500/10 rounded-2xl border border-indigo-500/30">
+                        <span
+                            class="text-xs font-black text-indigo-400 block mb-2 tracking-widest uppercase">Goal</span>
+                        <p class="text-sm text-indigo-100 font-medium">Light up the bulb using the <strong>XOR</strong>
+                            gate!</p>
+                    </div>
+                </div>
+                <button onclick="verifyLogicCircuit()"
+                    class="w-full py-3 px-4 rounded-xl font-bold text-sm flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 shadow-lg mt-4">Verify
+                    Circuit</button>
+            </div>
+            <!-- Sandbox -->
+            <div
+                class="flex-1 p-8 flex flex-col justify-between bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-slate-800 to-slate-950">
+                <div class="flex justify-center gap-3 mb-8">
+                    <button onclick="selectGate('AND')" id="gate-AND"
+                        class="gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-indigo-500 text-white border border-indigo-400 shadow-lg">AND</button>
+                    <button onclick="selectGate('OR')" id="gate-OR"
+                        class="gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-white/5 text-slate-400 border border-white/10">OR</button>
+                    <button onclick="selectGate('NOT')" id="gate-NOT"
+                        class="gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-white/5 text-slate-400 border border-white/10">NOT</button>
+                    <button onclick="selectGate('XOR')" id="gate-XOR"
+                        class="gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-white/5 text-slate-400 border border-white/10">XOR</button>
+                </div>
+                <!-- Canvas simulation representation -->
+                <div class="flex-1 flex flex-col md:flex-row items-center justify-around relative">
+                    <div class="flex flex-col gap-12 z-10">
+                        <div class="flex flex-col items-center gap-2 bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Switch A</span>
+                            <button onclick="toggleSwitch('A')" id="switch-A"
+                                class="w-16 h-8 rounded-full p-1 bg-slate-700 transition-all duration-300">
+                                <div id="switch-node-A"
+                                    class="bg-white w-6 h-6 rounded-full transform duration-300 translate-x-0"></div>
+                            </button>
+                        </div>
+                        <div id="switch-B-container"
+                            class="flex flex-col items-center gap-2 bg-white/5 p-4 rounded-2xl border border-white/10">
+                            <span class="text-xs font-bold text-slate-400 uppercase">Switch B</span>
+                            <button onclick="toggleSwitch('B')" id="switch-B"
+                                class="w-16 h-8 rounded-full p-1 bg-slate-700 transition-all duration-300">
+                                <div id="switch-node-B"
+                                    class="bg-white w-6 h-6 rounded-full transform duration-300 translate-x-0"></div>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- SVG Connecting logic lines -->
+                    <div class="hidden md:block absolute inset-0 pointer-events-none">
+                        <svg class="w-full h-full">
+                            <path id="wire-a" d="M 230 140 C 330 140 330 220 450 220" stroke="#334155" stroke-width="6"
+                                fill="transparent" />
+                            <path id="wire-b" d="M 230 320 C 330 320 330 220 450 220" stroke="#334155" stroke-width="6"
+                                fill="transparent" />
+                            <line id="wire-out" x1="55%" y1="50%" x2="80%" y2="50%" stroke="#334155" stroke-width="6" />
+                        </svg>
+                    </div>
+                    <!-- Gate Module Box -->
+                    <div
+                        class="bg-indigo-600 p-8 rounded-3xl border-4 border-indigo-400 shadow-2xl w-40 h-40 flex flex-col items-center justify-center z-10">
+                        <span id="gate-badge" class="text-4xl font-black text-white">AND</span>
+                    </div>
+                    <!-- Output Lightbulb element -->
+                    <div class="z-10 flex flex-col items-center">
+                        <div id="lightbulb-orb"
+                            class="w-32 h-32 rounded-full flex items-center justify-center transition-all duration-500 border-4 bg-slate-800 border-slate-700">
+                            <span class="text-5xl">🔌</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TURTLE PAINTER WINDOW -->
+    <div id="window-turtle"
+        class="absolute inset-4 md:inset-8 lg:inset-12 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl flex flex-col z-40 hidden overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center justify-between select-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-indigo-500/50 shadow-inner animate-pulse"></div>
+                <span class="text-xs font-black tracking-widest text-white uppercase opacity-80">🎨 Turtle
+                    Painter</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Minimize Button -->
+                <button onclick="minimizeApp('turtle')"
+                    class="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Minimize">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <!-- Close Button -->
+                <button onclick="closeApp('turtle')"
+                    class="text-white/60 hover:text-red-400 p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 flex flex-col md:flex-row bg-slate-100 text-slate-800 overflow-hidden font-sans">
+            <!-- Block Code Builder (Left Pane) -->
+            <div class="md:w-96 bg-white border-r border-slate-200 flex flex-col shadow-xl z-10 overflow-hidden">
+                <div class="p-4 bg-slate-50 border-b border-slate-200">
+                    <h2 class="text-lg font-black text-slate-700 flex items-center gap-2">🧩 Blocks Controller</h2>
+                    <p class="text-xs text-slate-500">Add programming instructions to trace geometries.</p>
+                </div>
+                <!-- Movement D-Pad -->
+                <div class="p-4 grid grid-cols-2 gap-3 border-b border-slate-200 bg-slate-50/50">
+                    <button onclick="addTurtleBlock('FD')"
+                        class="bg-blue-500 hover:bg-blue-400 text-white p-3 rounded-xl shadow-[0_4px_0_rgb(37,99,235)] active:translate-y-1 active:shadow-none flex flex-col items-center justify-center font-bold">Forward</button>
+                    <button onclick="addTurtleBlock('BK')"
+                        class="bg-blue-500 hover:bg-blue-400 text-white p-3 rounded-xl shadow-[0_4px_0_rgb(37,99,235)] active:translate-y-1 active:shadow-none flex flex-col items-center justify-center font-bold">Backward</button>
+                    <button onclick="addTurtleBlock('LT')"
+                        class="bg-purple-500 hover:bg-purple-400 text-white p-3 rounded-xl shadow-[0_4px_0_rgb(147,51,234)] active:translate-y-1 active:shadow-none flex flex-col items-center justify-center font-bold">Turn
+                        Left</button>
+                    <button onclick="addTurtleBlock('RT')"
+                        class="bg-purple-500 hover:bg-purple-400 text-white p-3 rounded-xl shadow-[0_4px_0_rgb(147,51,234)] active:translate-y-1 active:shadow-none flex flex-col items-center justify-center font-bold">Turn
+                        Right</button>
+                    <!-- Custom step sliders -->
+                    <div class="col-span-2 flex gap-2 mt-1">
+                        <div
+                            class="flex-1 bg-slate-100 p-2 rounded-lg flex items-center justify-between border border-slate-200">
+                            <span class="text-[10px] font-black text-slate-500">Steps:</span>
+                            <input id="turtle-steps-input" type="number" value="60"
+                                class="w-16 bg-white border border-slate-300 rounded text-center font-bold py-0.5 text-xs" />
+                        </div>
+                        <div
+                            class="flex-1 bg-slate-100 p-2 rounded-lg flex items-center justify-between border border-slate-200">
+                            <span class="text-[10px] font-black text-slate-500">Angle:</span>
+                            <input id="turtle-angle-input" type="number" value="90"
+                                class="w-16 bg-white border border-slate-300 rounded text-center font-bold py-0.5 text-xs" />
+                        </div>
+                    </div>
+                </div>
+                <!-- Active Script Stack -->
+                <div class="flex-1 bg-slate-50/20 p-4 overflow-y-auto flex flex-col">
+                    <div class="flex justify-between items-center mb-3">
+                        <span class="font-bold text-slate-700 text-sm">Your Code Stack:</span>
+                        <button onclick="clearTurtleStack()"
+                            class="text-xs text-red-500 font-bold bg-red-50 px-2 py-1 rounded">Clear All</button>
+                    </div>
+                    <div id="turtle-block-container" class="flex flex-col gap-1.5">
+                        <!-- Program lists filled by JS -->
+                    </div>
+                </div>
+            </div>
+            <!-- Graphics Display (Right Pane) -->
+            <div class="flex-1 bg-slate-200 flex flex-col">
+                <div class="bg-white p-3 border-b border-slate-200 flex items-center justify-between shadow-sm z-10">
+                    <div class="flex gap-2">
+                        <button onclick="loadTurtlePreset('square')"
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm">⏹️
+                            Square Preset</button>
+                        <button onclick="loadTurtlePreset('star')"
+                            class="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-1.5 rounded-lg border border-slate-300 shadow-sm">⭐
+                            Star Preset</button>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button onclick="setTurtleBrush('#3b82f6')"
+                            class="w-6 h-6 rounded-full bg-blue-500 border border-slate-300 hover:scale-110"></button>
+                        <button onclick="setTurtleBrush('#10b981')"
+                            class="w-6 h-6 rounded-full bg-emerald-500 border border-slate-300 hover:scale-110"></button>
+                        <button onclick="setTurtleBrush('#ef4444')"
+                            class="w-6 h-6 rounded-full bg-red-500 border border-slate-300 hover:scale-110"></button>
+                        <button onclick="setTurtleBrush('#8b5cf6')"
+                            class="w-6 h-6 rounded-full bg-purple-500 border border-slate-300 hover:scale-110"></button>
+                    </div>
+                </div>
+                <div class="flex-1 p-6 flex flex-col items-center justify-center relative">
+                    <div class="bg-white p-3 rounded-2xl shadow-xl">
+                        <canvas id="turtle-canvas" width="500" height="380"
+                            class="block bg-slate-950 rounded-xl border border-slate-300 shadow-inner"></canvas>
+                    </div>
+                    <div class="absolute bottom-8 right-8">
+                        <button onclick="verifyTurtleShape()"
+                            class="py-3 px-6 rounded-2xl font-black text-sm flex items-center gap-2 bg-blue-600 text-white shadow-xl hover:scale-105 active:scale-95">Verify
+                            Geometry Path</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- PC BUILDER WINDOW -->
+    <div id="window-assembler"
+        class="absolute inset-4 md:inset-8 lg:inset-12 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl flex flex-col z-40 hidden overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center justify-between select-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-indigo-500/50 shadow-inner animate-pulse"></div>
+                <span class="text-xs font-black tracking-widest text-white uppercase opacity-80">⚙️ PC Builder</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Minimize Button -->
+                <button onclick="minimizeApp('assembler')"
+                    class="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Minimize">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <!-- Close Button -->
+                <button onclick="closeApp('assembler')"
+                    class="text-white/60 hover:text-red-400 p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 flex flex-col lg:flex-row bg-slate-900 text-white overflow-hidden rounded-b-xl">
+            <!-- Shelf Area -->
+            <div class="lg:w-80 bg-slate-950/50 p-6 border-r border-white/10 flex flex-col overflow-y-auto">
+                <div class="bg-white/10 border border-white/20 rounded-2xl p-3 flex gap-3 items-center mb-4">
+                    <span class="text-3xl">🤖</span>
+                    <p class="text-xs text-slate-200 font-medium">Robo-Byte: Click a part below, then install it on the
+                        green motherboard!</p>
+                </div>
+                <div id="assembler-inventory" class="space-y-3">
+                    <!-- Inventory loaded dynamically -->
+                </div>
+            </div>
+            <!-- Assembly Area -->
+            <div class="flex-1 p-8 bg-[#0f172a] flex flex-col justify-center items-center relative">
+                <div id="pcb-board"
+                    class="bg-emerald-900/40 border-4 border-emerald-700 p-8 rounded-3xl shadow-2xl w-full max-w-2xl grid grid-cols-2 gap-6 relative overflow-hidden backdrop-blur-sm">
+
+                    <div onclick="installPart('cpu')" id="slot-cpu"
+                        class="h-32 border-4 border-dashed border-emerald-700/50 hover:border-amber-400 hover:bg-amber-400/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <span class="text-sm font-bold text-emerald-600/70 uppercase">CPU Socket</span>
+                    </div>
+                    <div onclick="installPart('ram')" id="slot-ram"
+                        class="h-32 border-4 border-dashed border-emerald-700/50 hover:border-amber-400 hover:bg-amber-400/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <span class="text-sm font-bold text-emerald-600/70 uppercase">RAM Sockets</span>
+                    </div>
+                    <div onclick="installPart('gpu')" id="slot-gpu"
+                        class="h-32 border-4 border-dashed border-emerald-700/50 hover:border-amber-400 hover:bg-amber-400/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <span class="text-sm font-bold text-emerald-600/70 uppercase">GPU PCIe</span>
+                    </div>
+                    <div onclick="installPart('ssd')" id="slot-ssd"
+                        class="h-32 border-4 border-dashed border-emerald-700/50 hover:border-amber-400 hover:bg-amber-400/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <span class="text-sm font-bold text-emerald-600/70 uppercase">M.2 Storage</span>
+                    </div>
+                    <div onclick="installPart('psu')" id="slot-psu"
+                        class="col-span-2 h-24 border-4 border-dashed border-emerald-700/50 hover:border-amber-400 hover:bg-amber-400/10 rounded-2xl flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <span class="text-sm font-bold text-emerald-600/70 uppercase">Power Supply Connect</span>
+                    </div>
+
+                </div>
+                <div id="pc-boot-msg"
+                    class="absolute top-8 bg-emerald-500 text-white font-black px-6 py-3 rounded-full shadow-[0_10px_40px_rgba(16,185,129,0.5)] hidden animate-bounce text-lg">
+                    SYSTEM BOOT ONLINE! 🚀
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- NETWORK ROUTER WINDOW -->
+    <div id="window-network"
+        class="absolute inset-4 md:inset-8 lg:inset-12 bg-white/10 backdrop-blur-2xl rounded-2xl border border-white/20 shadow-2xl flex flex-col z-40 hidden overflow-hidden">
+        <!-- Header -->
+        <div class="bg-white/5 border-b border-white/10 px-4 py-3 flex items-center justify-between select-none">
+            <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full bg-indigo-500/50 shadow-inner animate-pulse"></div>
+                <span class="text-xs font-black tracking-widest text-white uppercase opacity-80">📶 Net Router</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Minimize Button -->
+                <button onclick="minimizeApp('network')"
+                    class="text-white/60 hover:text-white p-1 hover:bg-white/10 rounded transition-colors"
+                    title="Minimize">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6" />
+                    </svg>
+                </button>
+                <!-- Close Button -->
+                <button onclick="closeApp('network')"
+                    class="text-white/60 hover:text-red-400 p-1 hover:bg-red-500/20 rounded transition-colors"
+                    title="Close">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <!-- Body -->
+        <div class="flex-1 flex flex-col lg:flex-row bg-[#0a0f1c] text-white overflow-hidden rounded-b-xl">
+            <!-- Side Config -->
+            <div
+                class="lg:w-80 bg-white/5 p-6 border-r border-white/10 flex flex-col justify-between backdrop-blur-md z-10">
+                <div>
+                    <div class="bg-white/10 border border-white/20 rounded-2xl p-3 flex gap-3 items-center">
+                        <span class="text-3xl">🤖</span>
+                        <p class="text-xs text-slate-200">Connect S ➔ A (or B) ➔ C ➔ D to design your highway!</p>
+                    </div>
+                    <div class="bg-blue-500/20 p-4 rounded-2xl border border-blue-500/30 mt-4">
+                        <span class="text-xs font-bold text-blue-300 uppercase block mb-2">Current Route:</span>
+                        <div id="network-route-list" class="flex items-center gap-1.5 flex-wrap">
+                            <span class="text-blue-200/50 text-sm">Select Node 'S' to start...</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-2 mt-4">
+                    <button onclick="simulateNetwork()"
+                        class="w-full py-3.5 rounded-xl font-black text-sm bg-blue-600 hover:bg-blue-500 shadow-lg">Send
+                        Data Packet 🚀</button>
+                    <button onclick="resetNetwork()"
+                        class="w-full py-2 rounded-xl text-xs bg-slate-800 text-slate-300">Reset Path</button>
+                </div>
+            </div>
+            <!-- Field Canvas Map -->
+            <div
+                class="flex-1 p-8 relative flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-blue-900/20 to-[#0a0f1c]">
+                <div class="w-full h-full relative max-w-4xl max-h-[500px]">
+                    <!-- SVG Network Links -->
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none">
+                        <line x1="10%" y1="50%" x2="35%" y2="25%" stroke="rgba(255,255,255,0.1)" stroke-width="4"
+                            stroke-dasharray="8 8" />
+                        <line x1="10%" y1="50%" x2="35%" y2="75%" stroke="rgba(255,255,255,0.1)" stroke-width="4"
+                            stroke-dasharray="8 8" />
+                        <line x1="35%" y1="25%" x2="65%" y2="50%" stroke="rgba(255,255,255,0.1)" stroke-width="4"
+                            stroke-dasharray="8 8" />
+                        <line x1="35%" y1="75%" x2="65%" y2="50%" stroke="rgba(255,255,255,0.1)" stroke-width="4"
+                            stroke-dasharray="8 8" />
+                        <line x1="65%" y1="50%" x2="90%" y2="50%" stroke="rgba(255,255,255,0.1)" stroke-width="4"
+                            stroke-dasharray="8 8" />
+
+                        <!-- Highlight Wires -->
+                        <line id="link-S-A" x1="10%" y1="50%" x2="35%" y2="25%" stroke="#334155" stroke-width="6"
+                            class="hidden" />
+                        <line id="link-S-B" x1="10%" y1="50%" x2="35%" y2="75%" stroke="#334155" stroke-width="6"
+                            class="hidden" />
+                        <line id="link-A-C" x1="35%" y1="25%" x2="65%" y2="50%" stroke="#334155" stroke-width="6"
+                            class="hidden" />
+                        <line id="link-B-C" x1="35%" y1="75%" x2="65%" y2="50%" stroke="#334155" stroke-width="6"
+                            class="hidden" />
+                        <line id="link-C-D" x1="65%" y1="50%" x2="90%" y2="50%" stroke="#334155" stroke-width="6"
+                            class="hidden" />
+                    </svg>
+
+                    <!-- Packet Cargo Dot -->
+                    <div id="cargo-packet"
+                        class="absolute w-8 h-8 bg-yellow-400 rounded-lg flex items-center justify-center text-lg z-30 shadow-[0_0_20px_rgba(250,204,21,0.8)] pointer-events-none hidden transition-all duration-500">
+                        📦
+                    </div>
+
+                    <!-- Nodes -->
+                    <button id="node-S" onclick="clickNetworkNode('S')"
+                        class="network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                        style="left: 10%; top: 50%; width: 130px;">
+                        <span class="text-4xl mb-2">💻</span>
+                        <span class="text-sm font-black text-white">Node S</span>
+                        <span class="text-[10px] text-blue-200">You (Sender)</span>
+                    </button>
+                    <button id="node-A" onclick="clickNetworkNode('A')"
+                        class="network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                        style="left: 35%; top: 25%; width: 130px;">
+                        <span class="text-4xl mb-2">📡</span>
+                        <span class="text-sm font-black text-white">Node A</span>
+                        <span class="text-[10px] text-blue-200">Switch A</span>
+                    </button>
+                    <button id="node-B" onclick="clickNetworkNode('B')"
+                        class="network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                        style="left: 35%; top: 75%; width: 130px;">
+                        <span class="text-4xl mb-2">📡</span>
+                        <span class="text-sm font-black text-white">Node B</span>
+                        <span class="text-[10px] text-blue-200">Switch B</span>
+                    </button>
+                    <button id="node-C" onclick="clickNetworkNode('C')"
+                        class="network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                        style="left: 65%; top: 50%; width: 130px;">
+                        <span class="text-4xl mb-2">📡</span>
+                        <span class="text-sm font-black text-white">Node C</span>
+                        <span class="text-[10px] text-blue-200">Firewall C</span>
+                    </button>
+                    <button id="node-D" onclick="clickNetworkNode('D')"
+                        class="network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2"
+                        style="left: 90%; top: 50%; width: 130px;">
+                        <span class="text-4xl mb-2">☁️</span>
+                        <span class="text-sm font-black text-white">Node D</span>
+                        <span class="text-[10px] text-blue-200">Server (Receiver)</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- --- DESKTOP POPUP: OS SYSTEM WELCOME MANUAL --- -->
+    <div id="welcome-modal"
+        class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-6 z-50">
+        <div
+            class="bg-white/10 backdrop-blur-2xl border border-white/20 rounded-3xl w-full max-w-2xl shadow-2xl p-8 relative overflow-hidden">
+            <button onclick="toggleWelcomeModal(false)"
+                class="absolute top-6 right-6 text-white/50 hover:text-white bg-black/20 p-2 rounded-full transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+
+            <div class="flex gap-4 items-center mb-6">
+                <div class="text-5xl drop-shadow-lg">🤖</div>
+                <div>
+                    <h3 class="text-xl font-black uppercase text-white tracking-wider font-mono">Welcome to EduOS!</h3>
+                    <p class="text-sm text-indigo-200 mt-1 font-medium">Native HTML, CSS, and Vanilla JS Student
+                        Sandbox.</p>
+                </div>
+            </div>
+
+            <p class="text-sm text-white/90 leading-relaxed mb-6 bg-black/20 p-4 rounded-xl border border-white/10">
+                Hi! I'm Robo-Byte, your local operating system AI assistant. Together, we'll learn computer science
+                inside this visual workspace. Click any icon behind this card to get started!
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-2">
+                <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 items-start">
+                    <span class="text-2xl mt-1">💻</span>
+                    <div>
+                        <strong class="text-white block mb-0.5">Terminal Quest</strong>
+                        <span class="text-xs text-white/70">Execute authentic command-line logs to discover golden
+                            artifact keys!</span>
+                    </div>
+                </div>
+                <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 items-start">
+                    <span class="text-2xl mt-1">🎨</span>
+                    <div>
+                        <strong class="text-white block mb-0.5">Turtle Paint</strong>
+                        <span class="text-xs text-white/70">Build beautiful, closed vector paths with visual programming
+                            code stacks.</span>
+                    </div>
+                </div>
+                <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 items-start">
+                    <span class="text-2xl mt-1">🔌</span>
+                    <div>
+                        <strong class="text-white block mb-0.5">Logic Gates</strong>
+                        <span class="text-xs text-white/70">Examine voltage paths inside AND, OR, XOR gate
+                            switches.</span>
+                    </div>
+                </div>
+                <div class="p-3 bg-white/5 rounded-xl border border-white/10 flex gap-3 items-start">
+                    <span class="text-2xl mt-1">🛠️</span>
+                    <div>
+                        <strong class="text-white block mb-0.5">PC Builder</strong>
+                        <span class="text-xs text-white/70">Mount CPUs, storage drives, memory sticks, and power
+                            cords.</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end">
+                <button onclick="toggleWelcomeModal(false)"
+                    class="bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-black tracking-wide px-8 py-3.5 rounded-full shadow-lg hover:scale-105 active:scale-95 transition-all">
+                    EXPLORE LAB WORKSPACE 🚀
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== CORE VANILLA JAVASCRIPT STATE ENGINE ==================== -->
+    <script>
+        // --- GLOBAL STATE REGISTRY ---
+        const OS = {
+            badgeCount: 0,
+            activeWindow: null,
+            minimizedWindows: [],
+            completed: {
+                terminal: false,
+                logic: false,
+                turtle: false,
+                assembler: false,
+                network: false
+            },
+            unlockedBadges: []
+        };
+
+        // --- SYSTEM INITIALIZER ---
+        window.onload = function () {
+            // Set clock
+            updateClock();
+            setInterval(updateClock, 1000);
+            playSound('boot');
+
+            // Initialize all nested component states
+            initTerminal();
+            initLogicCircuits();
+            initTurtlePainter();
+            initPCAssembler();
+            initNetworkRouter();
+        };
+
+        function updateClock() {
+            const now = new Date();
+            let hours = now.getHours();
+            let minutes = now.getMinutes();
+            const ampm = hours >= 12 ? 'PM' : 'AM';
+            hours = hours % 12;
+            hours = hours ? hours : 12; // the hour '0' should be '12'
+            minutes = minutes < 10 ? '0' + minutes : minutes;
+            const strTime = hours + ':' + minutes + ' ' + ampm;
+            document.getElementById('os-clock').textContent = strTime;
+        }
+
+        // --- OS WINDOW MANAGEMENT ---
+        function launchApp(appId) {
+            playSound('click');
+
+            // Hide active window
+            if (OS.activeWindow) {
+                document.getElementById(`window-${OS.activeWindow}`).classList.add('hidden');
+            }
+
+            OS.activeWindow = appId;
+            // Remove from minimized list
+            OS.minimizedWindows = OS.minimizedWindows.filter(id => id !== appId);
+
+            // Show window
+            const win = document.getElementById(`window-${appId}`);
+            win.classList.remove('hidden');
+
+            updateDock();
+        }
+
+        function closeApp(appId) {
+            playSound('click');
+            const win = document.getElementById(`window-${appId}`);
+            win.classList.add('hidden');
+
+            if (OS.activeWindow === appId) {
+                OS.activeWindow = null;
+            }
+            OS.minimizedWindows = OS.minimizedWindows.filter(id => id !== appId);
+            updateDock();
+        }
+
+        function minimizeApp(appId) {
+            playSound('click');
+            const win = document.getElementById(`window-${appId}`);
+            win.classList.add('hidden');
+
+            if (OS.activeWindow === appId) {
+                OS.activeWindow = null;
+            }
+            if (!OS.minimizedWindows.includes(appId)) {
+                OS.minimizedWindows.push(appId);
+            }
+            updateDock();
+        }
+
+        function updateDock() {
+            const dock = document.getElementById('dock-bar');
+            if (OS.minimizedWindows.length === 0) {
+                dock.classList.add('hidden');
+                return;
+            }
+            dock.classList.remove('hidden');
+            dock.innerHTML = '';
+            OS.minimizedWindows.forEach(appId => {
+                const btn = document.createElement('button');
+                btn.className = 'bg-white/10 hover:bg-white/20 border border-white/10 text-white px-4 py-2 rounded-2xl font-bold text-xs flex items-center gap-2 capitalize tracking-wide transition-all shadow-sm';
+                btn.onclick = () => launchApp(appId);
+                btn.innerHTML = `<div class="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></div>${appId}`;
+                dock.appendChild(btn);
+            });
+        }
+
+        function toggleWelcomeModal(show) {
+            playSound('click');
+            const modal = document.getElementById('welcome-modal');
+            if (show) {
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        // --- SYSTEM NOTIFICATIONS / ALERTS ---
+        function triggerBadge(appId, badgeName) {
+            if (OS.unlockedBadges.includes(badgeName)) return;
+            OS.unlockedBadges.push(badgeName);
+            OS.badgeCount += 1;
+            document.getElementById('badge-count').textContent = OS.badgeCount;
+            OS.completed[appId] = true;
+
+            // Update icon checkmark status
+            const checkMark = document.getElementById(`check-${appId}`);
+            if (checkMark) {
+                checkMark.classList.remove('hidden');
+            }
+
+            // Play success audio synth chord
+            playSound('success');
+
+            // Trigger glass notice alert
+            const alertPanel = document.getElementById('achievement-alert');
+            const alertMsg = document.getElementById('achievement-msg');
+            alertMsg.textContent = `Excellent! You solved ${appId} lab and earned the "${badgeName}" badge!`;
+            alertPanel.classList.remove('hidden');
+        }
+
+        function dismissAlert() {
+            document.getElementById('achievement-alert').classList.add('hidden');
+        }
+
+        // ==================== LAB 1: COMMAND LINE TERMINAL ====================
+        let terminalHistory = [];
+        let currentTerminalPath = '/';
+        let fileSystem = {
+            '/': { type: 'dir', contents: ['games_folder', 'secret_vault', 'welcome.txt'] },
+            '/welcome.txt': { type: 'file', contents: '🎈 Welcome young explorer! Your goal is to find the hidden key in the "secret_vault" folder!' },
+            '/games_folder': { type: 'dir', contents: ['tic-tac-toe.txt', 'high_scores.txt'] },
+            '/games_folder/tic-tac-toe.txt': { type: 'file', contents: 'X plays first! O won last time.' },
+            '/games_folder/high_scores.txt': { type: 'file', contents: 'Robo-Byte: 9999 points!' },
+            '/secret_vault': { type: 'dir', contents: ['.hidden_treasure.key'] },
+            '/secret_vault/.hidden_treasure.key': { type: 'file', contents: '🏆 GOLDEN_KEY_7749 (Quest complete!)' }
+        };
+        let currentQuestStep = 1;
+
+        function initTerminal() {
+            const input = document.getElementById('terminal-input');
+            input.addEventListener('keydown', function (e) {
+                if (e.key === 'Enter') {
+                    const cmd = input.value;
+                    runTerminalCommand(cmd);
+                    input.value = '';
+                }
+            });
+        }
+
+        function loadTerminalInput(text) {
+            document.getElementById('terminal-input').value = text;
+            document.getElementById('terminal-input').focus();
+        }
+
+        function appendTerminalHistory(text, type) {
+            const board = document.getElementById('terminal-history');
+            const div = document.createElement('div');
+            div.className = `leading-relaxed `;
+
+            if (type === 'user') div.className += 'text-[#56b6c2] font-semibold';
+            else if (type === 'error') div.className += 'text-[#e06c75]';
+            else if (type === 'success') div.className += 'text-[#98c379] font-bold';
+            else if (type === 'info') div.className += 'text-[#e5c07b]';
+            else div.className += 'text-[#abb2bf]';
+
+            div.textContent = text;
+            board.appendChild(div);
+            board.scrollTop = board.scrollHeight;
+        }
+
+        function runTerminalCommand(commandLine) {
+            const cmdTrimmed = commandLine.trim();
+            if (!cmdTrimmed) return;
+
+            appendTerminalHistory(`student@edu-os:${currentTerminalPath}$ ${cmdTrimmed}`, 'user');
+
+            const args = cmdTrimmed.split(' ');
+            const command = args[0].toLowerCase();
+            let output = '';
+            let outType = 'output';
+
+            switch (command) {
+                case 'help':
+                    output = 'Available Commands:\n📂 Navigation: ls, cd [dir], pwd\n📄 Files: cat [file], touch [file], rm [file], echo [text]\n📁 Folders: mkdir [dir]\n⚙️ System: date, whoami, clear, guide';
+                    break;
+                case 'guide':
+                    output = `Current Quest Objective (${currentQuestStep}/4):\n` +
+                        (currentQuestStep === 1 ? '👉 Step 1: Type "ls" to list files.' : '') +
+                        (currentQuestStep === 2 ? '👉 Step 2: Type "cd secret_vault" to enter the vault.' : '') +
+                        (currentQuestStep === 3 ? '👉 Step 3: Type "ls" inside the vault to see the hidden file.' : '') +
+                        (currentQuestStep === 4 ? '👉 Step 4: Type "cat .hidden_treasure.key" to grab the golden key!' : '');
+                    outType = 'info';
+                    break;
+                case 'clear':
+                    document.getElementById('terminal-history').innerHTML = '';
+                    return;
+                case 'pwd':
+                    output = currentTerminalPath;
+                    break;
+                case 'whoami':
+                    output = 'student';
+                    break;
+                case 'date':
+                    output = new Date().toString();
+                    break;
+                case 'ls': {
+                    const node = fileSystem[currentTerminalPath];
+                    if (node && node.type === 'dir') {
+                        if (node.contents.length === 0) {
+                            output = '(Empty folder)';
+                        } else {
+                            output = node.contents.map(item => {
+                                const itemPath = currentTerminalPath === '/' ? `/${item}` : `${currentTerminalPath}/${item}`;
+                                return fileSystem[itemPath]?.type === 'dir' ? `📁 ${item}` : `📄 ${item}`;
+                            }).join('    ');
+                        }
+                    } else {
+                        output = 'Error reading directory.';
+                        outType = 'error';
+                    }
+                    // Objective steps checkers
+                    if (currentQuestStep === 1 && currentTerminalPath === '/') {
+                        currentQuestStep = 2;
+                        document.getElementById('terminal-guide-text').textContent = "Step 1 complete! Now type 'cd secret_vault' to open the vault folder.";
+                        setTimeout(() => appendTerminalHistory('🎉 Step 1 Complete! Now try: "cd secret_vault"', 'success'), 100);
+                    } else if (currentQuestStep === 3 && currentTerminalPath === '/secret_vault') {
+                        currentQuestStep = 4;
+                        document.getElementById('terminal-guide-text').textContent = "You found it! Now type 'cat .hidden_treasure.key' to grab the golden key.";
+                        setTimeout(() => appendTerminalHistory('🎉 Step 3 Complete! You spotted the file. Now read: "cat .hidden_treasure.key"', 'success'), 100);
+                    }
+                    break;
+                }
+                case 'cd': {
+                    const target = args[1];
+                    if (!target || target === '~') {
+                        currentTerminalPath = '/';
+                        break;
+                    }
+                    let newPath = currentTerminalPath;
+                    if (target === '..') {
+                        if (currentTerminalPath !== '/') {
+                            const parts = currentTerminalPath.split('/');
+                            parts.pop();
+                            newPath = parts.length === 1 && parts[0] === '' ? '/' : parts.join('/');
+                        }
+                    } else {
+                        const relPath = currentTerminalPath === '/' ? `/${target}` : `${currentTerminalPath}/${target}`;
+                        if (fileSystem[relPath] && fileSystem[relPath].type === 'dir') {
+                            newPath = relPath;
+                        } else {
+                            output = `cd: ${target}: No such directory`;
+                            outType = 'error';
+                        }
+                    }
+                    if (newPath !== currentTerminalPath) {
+                        currentTerminalPath = newPath;
+                        document.getElementById('terminal-path').textContent = currentTerminalPath;
+                        if (currentQuestStep === 2 && newPath === '/secret_vault') {
+                            currentQuestStep = 3;
+                            document.getElementById('terminal-guide-text').textContent = "Inside the vault! Type 'ls' to reveal hidden storage files.";
+                            setTimeout(() => appendTerminalHistory('🎉 Step 2 Complete! Run "ls" to inspect hidden vault directories.', 'success'), 100);
+                        }
+                    }
+                    break;
+                }
+                case 'cat': {
+                    const target = args[1];
+                    if (!target) {
+                        output = 'Usage: cat [filename]';
+                        outType = 'error';
+                        break;
+                    }
+                    const filePath = currentTerminalPath === '/' ? `/${target}` : `${currentTerminalPath}/${target}`;
+                    const fileNode = fileSystem[filePath];
+                    if (fileNode && fileNode.type === 'file') {
+                        output = fileNode.contents;
+                        if (currentQuestStep === 4 && filePath === '/secret_vault/.hidden_treasure.key') {
+                            document.getElementById('terminal-guide-text').textContent = "Wow! You conquered Terminal Quest! Great command logic.";
+                            triggerBadge('terminal', 'Console Conqueror');
+                        }
+                    } else {
+                        output = `cat: ${target}: No such file or directory`;
+                        outType = 'error';
+                    }
+                    break;
+                }
+                case 'mkdir': {
+                    const dirName = args[1];
+                    if (!dirName) {
+                        output = 'Usage: mkdir [directory_name]';
+                        outType = 'error';
+                        break;
+                    }
+                    const newPath = currentTerminalPath === '/' ? `/${dirName}` : `${currentTerminalPath}/${dirName}`;
+                    if (fileSystem[newPath]) {
+                        output = `mkdir: file or folder exists`;
+                        outType = 'error';
+                    } else {
+                        fileSystem[currentTerminalPath].contents.push(dirName);
+                        fileSystem[newPath] = { type: 'dir', contents: [] };
+                        output = `Created directory: ${dirName}`;
+                    }
+                    break;
+                }
+                case 'touch': {
+                    const fileName = args[1];
+                    if (!fileName) {
+                        output = 'Usage: touch [file_name]';
+                        outType = 'error';
+                        break;
+                    }
+                    const newPath = currentTerminalPath === '/' ? `/${fileName}` : `${currentTerminalPath}/${fileName}`;
+                    if (!fileSystem[newPath]) {
+                        fileSystem[currentTerminalPath].contents.push(fileName);
+                        fileSystem[newPath] = { type: 'file', contents: '' };
+                        output = `Created empty file: ${fileName}`;
+                    } else {
+                        output = `touch: updated timestamp of ${fileName}`;
+                    }
+                    break;
+                }
+                case 'rm': {
+                    const target = args[1];
+                    if (!target) {
+                        output = 'Usage: rm [file_name]';
+                        outType = 'error';
+                        break;
+                    }
+                    const targetPath = currentTerminalPath === '/' ? `/${target}` : `${currentTerminalPath}/${target}`;
+                    if (fileSystem[targetPath] && fileSystem[targetPath].type === 'file') {
+                        fileSystem[currentTerminalPath].contents = fileSystem[currentTerminalPath].contents.filter(i => i !== target);
+                        delete fileSystem[targetPath];
+                        output = `Removed file: ${target}`;
+                    } else {
+                        output = `rm: cannot remove '${target}': No such file or is directory`;
+                        outType = 'error';
+                    }
+                    break;
+                }
+                case 'echo': {
+                    output = args.slice(1).join(' ') || ' ';
+                    break;
+                }
+                default:
+                    output = `Command not recognized: ${command}. Type "help" for a list of valid commands.`;
+                    outType = 'error';
+            }
+
+            appendTerminalHistory(output, outType);
+        }
+
+        // ==================== LAB 2: LOGIC CIRCUITS ====================
+        let logicState = {
+            inputA: false,
+            inputB: false,
+            gate: 'AND'
+        };
+
+        function initLogicCircuits() {
+            updateLogicCircuitVisuals();
+        }
+
+        function toggleSwitch(nodeId) {
+            playSound('click');
+            logicState[`input${nodeId}`] = !logicState[`input${nodeId}`];
+
+            const switchNode = document.getElementById(`switch-node-${nodeId}`);
+            const switchBtn = document.getElementById(`switch-${nodeId}`);
+
+            if (logicState[`input${nodeId}`]) {
+                switchNode.className = 'bg-white w-6 h-6 rounded-full transform duration-300 translate-x-8';
+                switchBtn.className = 'w-16 h-8 rounded-full p-1 bg-emerald-500 transition-all duration-300';
+            } else {
+                switchNode.className = 'bg-white w-6 h-6 rounded-full transform duration-300 translate-x-0';
+                switchBtn.className = 'w-16 h-8 rounded-full p-1 bg-slate-700 transition-all duration-300';
+            }
+
+            updateLogicCircuitVisuals();
+        }
+
+        function selectGate(gateName) {
+            playSound('click');
+            logicState.gate = gateName;
+
+            // Update gate active button borders
+            document.querySelectorAll('.gate-btn').forEach(btn => {
+                btn.className = 'gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-white/5 text-slate-400 border border-white/10';
+            });
+            document.getElementById(`gate-${gateName}`).className = 'gate-btn px-6 py-2.5 rounded-xl text-sm font-black tracking-widest bg-indigo-500 text-white border border-indigo-400 shadow-lg';
+
+            // Update name badge inside gate block
+            document.getElementById('gate-badge').textContent = gateName;
+
+            // Hide or show Input B based on gate
+            const switchBContainer = document.getElementById('switch-B-container');
+            if (gateName === 'NOT') {
+                switchBContainer.style.display = 'none';
+            } else {
+                switchBContainer.style.display = 'flex';
+            }
+
+            updateLogicCircuitVisuals();
+        }
+
+        function updateLogicCircuitVisuals() {
+            let result = false;
+            const { inputA, inputB, gate } = logicState;
+
+            if (gate === 'AND') result = inputA && inputB;
+            else if (gate === 'OR') result = inputA || inputB;
+            else if (gate === 'NOT') result = !inputA;
+            else if (gate === 'XOR') result = inputA !== inputB;
+
+            // Color wires based on current flow
+            document.getElementById('wire-a').setAttribute('stroke', inputA ? '#34d399' : '#334155');
+            if (gate !== 'NOT') {
+                document.getElementById('wire-b').setAttribute('stroke', inputB ? '#34d399' : '#334155');
+            }
+            document.getElementById('wire-out').setAttribute('stroke', result ? '#fbbf24' : '#334155');
+
+            // Update Lightbulb bulb color & glow
+            const bulb = document.getElementById('lightbulb-orb');
+            if (result) {
+                bulb.className = 'w-32 h-32 rounded-full flex items-center justify-center transition-all duration-500 border-4 bg-yellow-400 border-yellow-200 shadow-[0_0_80px_rgba(250,204,21,0.8)]';
+                bulb.innerHTML = '<span class="text-5xl">💡</span>';
+            } else {
+                bulb.className = 'w-32 h-32 rounded-full flex items-center justify-center transition-all duration-500 border-4 bg-slate-800 border-slate-700';
+                bulb.innerHTML = '<span class="text-5xl">🔌</span>';
+            }
+        }
+
+        function verifyLogicCircuit() {
+            // Evaluate if student successfully lit XOR bulb
+            const { inputA, inputB, gate } = logicState;
+            const result = inputA !== inputB;
+
+            if (gate === 'XOR' && result) {
+                triggerBadge('logic', 'Logic Legend');
+            } else {
+                playSound('error');
+                dismissAlert(); // Ensure old alerts are cleared
+                triggerBadge('logic', 'N/A'); // Dummy to trigger failure popup if they get it wrong
+                document.getElementById('badge-count').textContent = OS.badgeCount; // reset
+                OS.unlockedBadges = OS.unlockedBadges.filter(b => b !== 'Logic Legend');
+                OS.completed.logic = false;
+                document.getElementById('check-logic').classList.add('hidden');
+
+                // Throw simple modal hint
+                alert("Not quite right! Select the XOR gate, configure Switch A different from Switch B, so the output lights up!");
+            }
+        }
+
+        // ==================== LAB 3: TURTLE PAINTER ====================
+        let turtleCommands = [];
+        let brushColor = '#3b82f6';
+
+        function initTurtlePainter() {
+            renderTurtleStack();
+        }
+
+        function setTurtleBrush(color) {
+            playSound('click');
+            brushColor = color;
+            drawTurtleOnCanvas();
+        }
+
+        function addTurtleBlock(cmdType) {
+            const stepVal = parseInt(document.getElementById('turtle-steps-input').value) || 50;
+            const angleVal = parseInt(document.getElementById('turtle-angle-input').value) || 90;
+            const value = (cmdType === 'FD' || cmdType === 'BK') ? stepVal : angleVal;
+
+            playSound('click');
+            turtleCommands.push({ command: cmdType, value: value, id: Date.now() });
+            renderTurtleStack();
+        }
+
+        function deleteTurtleBlock(id) {
+            playSound('click');
+            turtleCommands = turtleCommands.filter(c => c.id !== id);
+            renderTurtleStack();
+        }
+
+        function clearTurtleStack() {
+            playSound('click');
+            turtleCommands = [];
+            renderTurtleStack();
+        }
+
+        function loadTurtlePreset(presetType) {
+            playSound('click');
+            if (presetType === 'square') {
+                turtleCommands = [
+                    { command: 'FD', value: 80, id: 1 }, { command: 'RT', value: 90, id: 2 },
+                    { command: 'FD', value: 80, id: 3 }, { command: 'RT', value: 90, id: 4 },
+                    { command: 'FD', value: 80, id: 5 }, { command: 'RT', value: 90, id: 6 },
+                    { command: 'FD', value: 80, id: 7 }, { command: 'RT', value: 90, id: 8 }
+                ];
+            } else if (presetType === 'star') {
+                turtleCommands = [
+                    { command: 'FD', value: 100, id: 1 }, { command: 'RT', value: 144, id: 2 },
+                    { command: 'FD', value: 100, id: 3 }, { command: 'RT', value: 144, id: 4 },
+                    { command: 'FD', value: 100, id: 5 }, { command: 'RT', value: 144, id: 6 },
+                    { command: 'FD', value: 100, id: 7 }, { command: 'RT', value: 144, id: 8 },
+                    { command: 'FD', value: 100, id: 9 }, { command: 'RT', value: 144, id: 10 }
+                ];
+            }
+            renderTurtleStack();
+        }
+
+        // Render visual layout list
+        function renderTurtleStack() {
+            const container = document.getElementById('turtle-block-container');
+            container.innerHTML = '';
+
+            turtleCommands.forEach((item, idx) => {
+                let blockColor = 'bg-blue-500 border-blue-600 shadow-blue-500/50';
+                let blockName = 'Move Forward';
+                if (item.command === 'BK') blockName = 'Move Backward';
+                if (item.command === 'RT') {
+                    blockColor = 'bg-purple-500 border-purple-600 shadow-purple-500/50';
+                    blockName = 'Turn Right';
+                }
+                if (item.command === 'LT') {
+                    blockColor = 'bg-purple-500 border-purple-600 shadow-purple-500/50';
+                    blockName = 'Turn Left';
+                }
+
+                const block = document.createElement('div');
+                block.className = `${blockColor} text-white p-2.5 rounded-lg border-b-4 shadow-sm flex justify-between items-center`;
+                block.innerHTML = `
+          <div class="font-bold text-sm flex items-center gap-2">
+            <span class="bg-white/20 rounded-full w-5 h-5 flex items-center justify-center text-[10px]">${idx + 1}</span>
+            ${blockName} <span class="bg-white/90 text-slate-800 px-1.5 py-0.5 rounded text-xs ml-1">${item.value}</span>
+          </div>
+          <button onclick="deleteTurtleBlock(${item.id})" class="bg-black/20 hover:bg-black/40 p-1 rounded-full text-white">X</button>
+        `;
+                container.appendChild(block);
+            });
+
+            drawTurtleOnCanvas();
+        }
+
+        function drawTurtleOnCanvas() {
+            const canvas = document.getElementById('turtle-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            let x = canvas.width / 2;
+            let y = canvas.height / 2;
+            let angle = -Math.PI / 2; // Pointing upwards
+
+            ctx.strokeStyle = brushColor;
+            ctx.lineWidth = 5;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+
+            turtleCommands.forEach((item) => {
+                if (item.command === 'FD') {
+                    x += Math.cos(angle) * item.value;
+                    y += Math.sin(angle) * item.value;
+                    ctx.lineTo(x, y);
+                } else if (item.command === 'BK') {
+                    x -= Math.cos(angle) * item.value;
+                    y -= Math.sin(angle) * item.value;
+                    ctx.lineTo(x, y);
+                } else if (item.command === 'RT') {
+                    angle += (item.value * Math.PI) / 180;
+                } else if (item.command === 'LT') {
+                    angle -= (item.value * Math.PI) / 180;
+                }
+            });
+            ctx.stroke();
+
+            // Render Turtle sprite
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle + Math.PI / 2);
+
+            // Outer shell
+            ctx.fillStyle = '#10b981';
+            ctx.beginPath();
+            ctx.ellipse(0, 0, 12, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Little head
+            ctx.beginPath();
+            ctx.arc(0, -16, 6, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Tiny Flippers
+            ctx.beginPath(); ctx.arc(-10, -8, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(10, -8, 5, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(-8, 10, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.beginPath(); ctx.arc(8, 10, 4, 0, Math.PI * 2); ctx.fill();
+
+            ctx.restore();
+        }
+
+        function verifyTurtleShape() {
+            const canvas = document.getElementById('turtle-canvas');
+            let x = canvas.width / 2;
+            let y = canvas.height / 2;
+            let angle = -Math.PI / 2;
+
+            turtleCommands.forEach((item) => {
+                if (item.command === 'FD') { x += Math.cos(angle) * item.value; y += Math.sin(angle) * item.value; }
+                else if (item.command === 'BK') { x -= Math.cos(angle) * item.value; y -= Math.sin(angle) * item.value; }
+                else if (item.command === 'RT') { angle += (item.value * Math.PI) / 180; }
+                else if (item.command === 'LT') { angle -= (item.value * Math.PI) / 180; }
+            });
+
+            const distFromStart = Math.sqrt(Math.pow(x - canvas.width / 2, 2) + Math.pow(y - canvas.height / 2, 2));
+
+            if (distFromStart < 15 && turtleCommands.length >= 3) {
+                triggerBadge('turtle', 'Master Artist');
+            } else {
+                playSound('error');
+                alert("The shape is open! Program the Turtle back near its home (exactly in the center) to earn the Art Badge.");
+            }
+        }
+
+        // ==================== LAB 4: PC BUILDER ====================
+        const pcParts = [
+            { id: 'cpu', name: 'CPU (Brain)', icon: '🧠', slot: 'cpu_slot', desc: 'Processes calculations.' },
+            { id: 'ram', name: 'RAM (Memory)', icon: '💾', slot: 'ram_slot', desc: 'Temporary storage.' },
+            { id: 'gpu', name: 'Graphics Card', icon: '🎮', slot: 'gpu_slot', desc: 'Renders gorgeous 3D images.' },
+            { id: 'ssd', name: 'SSD Storage', icon: '⚡', slot: 'storage_slot', desc: 'Saves files permanently.' },
+            { id: 'psu', name: 'Power Supply', icon: '🔌', slot: 'power_slot', desc: 'Feeds electricity.' }
+        ];
+        let selectedPartId = null;
+        let installedParts = { cpu: false, ram: false, gpu: false, ssd: false, psu: false };
+
+        function initPCAssembler() {
+            renderPCInventory();
+        }
+
+        function renderPCInventory() {
+            const shelf = document.getElementById('assembler-inventory');
+            shelf.innerHTML = '';
+
+            pcParts.forEach(part => {
+                const isInstalled = installedParts[part.id];
+                const btn = document.createElement('button');
+
+                btn.disabled = isInstalled;
+                btn.onclick = () => selectPCPart(part.id);
+
+                btn.className = `w-full text-left p-3 rounded-xl border-2 transition-all flex items-center gap-4 ${isInstalled ? 'opacity-30 bg-white/5 border-white/5 cursor-not-allowed'
+                        : selectedPartId === part.id ? 'border-amber-400 bg-amber-400/20 scale-105 shadow-md'
+                            : 'border-white/10 bg-white/5 hover:bg-white/10'
+                    }`;
+
+                btn.innerHTML = `
+          <span class="text-3xl bg-black/30 p-2 rounded-lg">${part.icon}</span>
+          <div>
+            <div class="font-bold text-sm text-slate-100">${part.name}</div>
+            <div class="text-[11px] text-slate-400 mt-0.5">${part.desc}</div>
+          </div>
+        `;
+                shelf.appendChild(btn);
+            });
+        }
+
+        function selectPCPart(partId) {
+            playSound('click');
+            selectedPartId = partId;
+            renderPCInventory();
+        }
+
+        function installPart(slotId) {
+            if (!selectedPartId) return;
+
+            if (selectedPartId !== slotId) {
+                playSound('error');
+                alert(`Oops! That motherboard socket doesn't fit the ${selectedPartId.toUpperCase()}. Match the modules!`);
+                return;
+            }
+
+            playSound('click');
+            installedParts[selectedPartId] = true;
+
+            const slotBox = document.getElementById(`slot-${slotId}`);
+            const partObj = pcParts.find(p => p.id === slotId);
+
+            // Transform motherboard socket visually
+            slotBox.className = 'h-32 border-4 border-solid border-emerald-400 bg-emerald-400/20 rounded-2xl flex flex-col items-center justify-center cursor-default';
+            slotBox.innerHTML = `<span class="text-5xl animate-bounce">${partObj.icon}</span><span class="text-[10px] text-emerald-200 uppercase font-black mt-1">${partObj.name} Mounted</span>`;
+
+            selectedPartId = null;
+            renderPCInventory();
+
+            // Check if all parts loaded
+            const allLoaded = Object.values(installedParts).every(status => status === true);
+            if (allLoaded) {
+                document.getElementById('pc-boot-msg').classList.remove('hidden');
+                triggerBadge('assembler', 'Hardware Master');
+            }
+        }
+
+        // ==================== LAB 5: NETWORK ROUTER ====================
+        let networkRoute = [];
+        let packetPosition = { x: 10, y: 50 };
+
+        function initNetworkRouter() {
+            resetNetwork();
+        }
+
+        function clickNetworkNode(nodeId) {
+            playSound('click');
+
+            if (networkRoute.length === 0) {
+                if (nodeId === 'S') {
+                    networkRoute.push('S');
+                    document.getElementById('node-S').classList.add('bg-blue-500/40', 'border-blue-400', 'scale-110');
+                }
+                updateNetworkUI();
+                return;
+            }
+
+            if (networkRoute.includes(nodeId)) {
+                if (networkRoute[networkRoute.length - 1] === nodeId) {
+                    networkRoute.pop();
+                    document.getElementById(`node-${nodeId}`).classList.remove('bg-blue-500/40', 'border-blue-400', 'scale-110');
+                }
+                updateNetworkUI();
+                return;
+            }
+
+            const lastNode = networkRoute[networkRoute.length - 1];
+            let valid = false;
+
+            if (lastNode === 'S' && (nodeId === 'A' || nodeId === 'B')) valid = true;
+            if ((lastNode === 'A' || lastNode === 'B') && nodeId === 'C') valid = true;
+            if (lastNode === 'C' && nodeId === 'D') valid = true;
+
+            if (valid) {
+                networkRoute.push(nodeId);
+                document.getElementById(`node-${nodeId}`).classList.add('bg-blue-500/40', 'border-blue-400', 'scale-110');
+            } else {
+                playSound('error');
+                alert("Packets cannot jump through space! You must build adjacent path link jumps.");
+            }
+
+            updateNetworkUI();
+        }
+
+        function updateNetworkUI() {
+            // Clear all active links first
+            const links = ['S-A', 'S-B', 'A-C', 'B-C', 'C-D'];
+            links.forEach(l => {
+                document.getElementById(`link-${l}`).classList.add('hidden');
+            });
+
+            // Render links inside route
+            for (let i = 0; i < networkRoute.length - 1; i++) {
+                const from = networkRoute[i];
+                const to = networkRoute[i + 1];
+                const combined = `${from}-${to}`;
+                const reverse = `${to}-${from}`;
+
+                const wire = document.getElementById(`link-${combined}`) || document.getElementById(`link-${reverse}`);
+                if (wire) {
+                    wire.classList.remove('hidden');
+                    wire.setAttribute('stroke', '#60a5fa');
+                }
+            }
+
+            // Update list text
+            const listContainer = document.getElementById('network-route-list');
+            if (networkRoute.length === 0) {
+                listContainer.innerHTML = `<span class="text-blue-200/50 text-sm">Select Node 'S' to start...</span>`;
+            } else {
+                listContainer.innerHTML = '';
+                networkRoute.forEach(node => {
+                    const badge = document.createElement('span');
+                    badge.className = 'flex items-center text-blue-100 font-black text-lg bg-blue-600 w-8 h-8 rounded-full justify-center shadow-lg';
+                    badge.textContent = node;
+                    listContainer.appendChild(badge);
+                });
+            }
+        }
+
+        function simulateNetwork() {
+            if (networkRoute.length === 0) return;
+
+            const pathCompleted = networkRoute.includes('S') && networkRoute.includes('C') && networkRoute.includes('D');
+
+            if (pathCompleted) {
+                playSound('click');
+                const packet = document.getElementById('cargo-packet');
+                packet.classList.remove('hidden');
+
+                let stepIndex = 0;
+                const coordinates = {
+                    S: { x: 10, y: 50 },
+                    A: { x: 35, y: 25 },
+                    B: { x: 35, y: 75 },
+                    C: { x: 65, y: 50 },
+                    D: { x: 90, y: 50 }
+                };
+
+                function travel() {
+                    if (stepIndex < networkRoute.length) {
+                        const nodeKey = networkRoute[stepIndex];
+                        const coord = coordinates[nodeKey];
+                        packet.style.left = `${coord.x}%`;
+                        packet.style.top = `${coord.y}%`;
+                        stepIndex++;
+                        setTimeout(travel, 600);
+                    } else {
+                        packet.classList.add('hidden');
+                        triggerBadge('network', 'Network Pro');
+                    }
+                }
+                travel();
+            } else {
+                playSound('error');
+                alert("The delivery pipeline is broken! Program node-to-node jumps until you reach the server (D).");
+            }
+        }
+
+        function resetNetwork() {
+            playSound('click');
+            networkRoute = [];
+            document.querySelectorAll('.network-node').forEach(node => {
+                node.className = 'network-node absolute rounded-2xl p-4 bg-white/5 border border-white/10 flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2';
+            });
+            document.getElementById('cargo-packet').classList.add('hidden');
+            updateNetworkUI();
+        }
+
+        // ==================== SYSTEM SYNTH MUSIC & SFX ====================
+        // Safe Web Audio API synthesizer generators
+        function playSound(type) {
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const shadowGain = ctx.createGain();
+
+                osc.connect(shadowGain);
+                shadowGain.connect(ctx.destination);
+
+                if (type === 'click') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, ctx.currentTime);
+                    shadowGain.gain.setValueAtTime(0.04, ctx.currentTime);
+                    shadowGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.1);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.12);
+                } else if (type === 'success') {
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.1); // E5
+                    osc.frequency.setValueAtTime(783.99, ctx.currentTime + 0.2); // G5
+                    osc.frequency.setValueAtTime(1046.50, ctx.currentTime + 0.3); // C6
+                    shadowGain.gain.setValueAtTime(0.06, ctx.currentTime);
+                    shadowGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.55);
+                } else if (type === 'error') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(180, ctx.currentTime);
+                    osc.frequency.setValueAtTime(120, ctx.currentTime + 0.1);
+                    shadowGain.gain.setValueAtTime(0.06, ctx.currentTime);
+                    shadowGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.3);
+                } else if (type === 'boot') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(329.63, ctx.currentTime); // E4
+                    osc.frequency.setValueAtTime(392.00, ctx.currentTime + 0.1); // G4
+                    osc.frequency.setValueAtTime(523.25, ctx.currentTime + 0.2); // C5
+                    osc.frequency.setValueAtTime(659.25, ctx.currentTime + 0.3); // E5
+                    shadowGain.gain.setValueAtTime(0.04, ctx.currentTime);
+                    shadowGain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+                    osc.start();
+                    osc.stop(ctx.currentTime + 0.65);
+                }
+            } catch (e) {
+                // Web Audio blocks initial loading if tab interaction has not happened.
+            }
+        }
+    </script>
+</body>
+
+</html>
