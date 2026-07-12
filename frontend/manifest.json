@@ -1,28 +1,40 @@
 {
   "name": "VidyaQuest – STEM Learning",
   "short_name": "VidyaQuest",
-  "description": "Gamified STEM Education for Rural Students",
+  "description": "Gamified STEM Education for Rural Students. Works fully offline.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0F172A",
   "theme_color": "#FF6B35",
   "orientation": "portrait-primary",
+  "prefer_related_applications": false,
   "icons": [
-    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png" }
+    { "src": "assets/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "assets/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
   ],
   "categories": ["education", "productivity"],
   "lang": "en",
+  "dir": "ltr",
   "shortcuts": [
     {
       "name": "Dashboard",
+      "short_name": "Dashboard",
       "url": "/?tab=dashboard",
       "description": "Go to your learning dashboard"
     },
     {
       "name": "Quizzes",
+      "short_name": "Quizzes",
       "url": "/?tab=quizzes",
       "description": "Play quizzes"
+    },
+    {
+      "name": "Download Offline",
+      "short_name": "Offline",
+      "url": "/?tab=dashboard&action=download",
+      "description": "Download all lessons for offline use"
     }
-  ]
+  ],
+  "screenshots": [],
+  "related_applications": []
 }

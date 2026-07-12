@@ -136,7 +136,44 @@ function showRetryToast(msg) {
   _retryToastEl._hideTimer = setTimeout(() => _retryToastEl.classList.remove('show'), 3000);
 }
 
-async function api(endpoint, method='GET', body=null, { retries=2, timeout=8000 }={}) {
+// ── Simple in-memory + localStorage response cache for repeated GET requests ──
+// Prevents hammering the server on every screen navigation (saves data on metered connections)
+const _apiCache = new Map();
+const _API_CACHE_TTL = 60 * 1000; // 1 minute in-memory TTL
+const _API_CACHEABLE = ['/api/subjects', '/api/leaderboard', '/api/badges'];
+
+function _getCachedResponse(endpoint) {
+  // Check in-memory first (fastest)
+  if (_apiCache.has(endpoint)) {
+    const { data, ts } = _apiCache.get(endpoint);
+    if (Date.now() - ts < _API_CACHE_TTL) return data;
+    _apiCache.delete(endpoint);
+  }
+  // Fallback to localStorage (survives page reload)
+  try {
+    const raw = localStorage.getItem('vq_cache_' + endpoint);
+    if (raw) {
+      const { data, ts } = JSON.parse(raw);
+      if (Date.now() - ts < _API_CACHE_TTL * 5) return data; // 5-min localStorage TTL
+    }
+  } catch(e) {}
+  return null;
+}
+
+function _setCachedResponse(endpoint, data) {
+  const entry = { data, ts: Date.now() };
+  _apiCache.set(endpoint, entry);
+  try { localStorage.setItem('vq_cache_' + endpoint, JSON.stringify(entry)); } catch(e) {}
+}
+
+async function api(endpoint, method='GET', body=null, { retries=2, timeout=5000, cache=false }={}) {
+  // Serve cacheable GET requests from cache when available (saves bandwidth)
+  const isCacheable = method === 'GET' && (cache || _API_CACHEABLE.some(p => endpoint.startsWith(p)));
+  if (isCacheable) {
+    const cached = _getCachedResponse(endpoint);
+    if (cached) return cached;
+  }
+
   const opts = { method, headers: {'Content-Type':'application/json'} };
   if (currentToken) opts.headers['Authorization'] = 'Bearer ' + currentToken;
   if (body) opts.body = JSON.stringify(body);
@@ -150,6 +187,8 @@ async function api(endpoint, method='GET', body=null, { retries=2, timeout=8000 
       clearTimeout(timerId);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Request failed');
+      // Store successful GET response in cache
+      if (isCacheable) _setCachedResponse(endpoint, data);
       return data;
     } catch(e) {
       clearTimeout(timerId);
@@ -169,6 +208,7 @@ async function api(endpoint, method='GET', body=null, { retries=2, timeout=8000 
   }
   throw lastErr;
 }
+
 
 // ===== PASSWORD STRENGTH =====
 function checkPasswordStrength(password) {
@@ -356,8 +396,9 @@ function loginSuccess(data) {
   
   const langSwitcher = document.getElementById('lang-switcher');
   if (langSwitcher) {
-    const langNames = { 'en': 'EN 🇬🇧', 'hi': 'हि 🇮🇳', 'te': 'తె 🇮🇳', 'mr': 'म 🇮🇳', 'or': 'ଓଡ଼ 🇮🇳' };
-    langSwitcher.innerHTML = prefs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
+    const langNames = { 'en': 'English 🇬🇧', 'hi': 'हिंदी 🇮🇳', 'te': 'తెలుగు 🇮🇳', 'mr': 'मराठी 🇮🇳' };
+    const allLangs = ['en', 'hi', 'te', 'mr'];
+    langSwitcher.innerHTML = allLangs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
     langSwitcher.value = currentLanguage;
   }
   document.getElementById('auth-screen').classList.remove('active');
@@ -479,11 +520,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       const savedLang = localStorage.getItem('vq_lang_' + currentUser.id);
       currentLanguage = (savedLang && prefs.includes(savedLang)) ? savedLang : (prefs[0] || currentUser.language || 'en');
 
-      // Populate lang switcher with only user's chosen languages
+      // Populate lang switcher with all supported languages
       const langSwitcher = document.getElementById('lang-switcher');
       if (langSwitcher) {
-        const langNames = { 'en': 'EN 🇬🇧', 'hi': 'हि 🇮🇳', 'te': 'తె 🇮🇳', 'mr': 'म 🇮🇳', 'or': 'ଓଡ़ 🇮🇳' };
-        langSwitcher.innerHTML = prefs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
+        const langNames = { 'en': 'English 🇬🇧', 'hi': 'हिंदी 🇮🇳', 'te': 'తెలుగు 🇮🇳', 'mr': 'मराठी 🇮🇳' };
+        const allLangs = ['en', 'hi', 'te', 'mr'];
+        langSwitcher.innerHTML = allLangs.map(l => `<option value="${l}">${langNames[l] || l}</option>`).join('');
         langSwitcher.value = currentLanguage;
       }
 
@@ -749,7 +791,93 @@ async function loadHome() {
   } catch (err) {
     console.error("Error loading student dashboard:", err);
   }
+
+  // Render offline readiness card on dashboard (helps rural students prepare)
+  renderOfflineReadinessCard();
 }
+
+// ── Download ALL lessons for offline use in one tap ──────────────────────────
+async function downloadAllLessonsOffline() {
+  const btn = document.getElementById('btn-download-all');
+  const status = document.getElementById('offline-dl-status');
+  if (!navigator.onLine) {
+    showToast('❌ You must be online to download lessons for offline use.');
+    return;
+  }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Downloading…'; }
+  try {
+    const subjects = await api('/api/subjects');
+    let total = 0, done = 0;
+    for (const subj of subjects) {
+      const lessons = await api('/api/lessons/' + subj.id);
+      total += (lessons || []).length;
+    }
+    for (const subj of subjects) {
+      const lessons = await api('/api/lessons/' + subj.id);
+      for (const lesson of (lessons || [])) {
+        try {
+          const lessonFull = await api('/api/lesson/' + lesson.id);
+          const hintData   = await api('/api/offline/download-hints/' + lesson.id).catch(() => ({ hints: [] }));
+          await saveOfflineLesson(lessonFull, lessonFull.questions || [], hintData.hints || []);
+          done++;
+          if (status) status.textContent = `${done}/${total} lessons downloaded`;
+        } catch(e) { 
+          console.error(`Failed to download lesson ${lesson.id}:`, e);
+        }
+      }
+    }
+    showToast(`✅ All ${done} lessons saved! App works fully offline now.`);
+    if (btn) { btn.textContent = '✅ All Downloaded'; btn.style.background = 'rgba(6,214,160,0.15)'; btn.style.color = 'var(--green)'; }
+    if (status) status.textContent = `${done} lessons ready offline`;
+  } catch(err) {
+    console.error('Bulk download error:', err);
+    showToast('❌ Download failed. Please try again.');
+    if (btn) { btn.disabled = false; btn.textContent = '📥 Download All Lessons'; }
+  }
+}
+
+
+// ── Offline readiness card shown on the student dashboard ────────────────────
+async function renderOfflineReadinessCard() {
+  const container = document.getElementById('offline-readiness-card');
+  if (!container) return;
+
+  // Count how many lessons are already downloaded
+  let downloadedCount = 0;
+  try {
+    const db = await initOfflineDB();
+    const tx = db.transaction(['lessons'], 'readonly');
+    const store = tx.objectStore('lessons');
+    const req = store.count();
+    downloadedCount = await new Promise((res) => {
+      req.onsuccess = () => res(req.result);
+      req.onerror  = () => res(0);
+    });
+  } catch(e) {}
+
+  const isOffline = !navigator.onLine;
+  const statusColor = downloadedCount > 0 ? 'var(--green)' : (isOffline ? '#EF4444' : 'var(--accent)');
+  const statusIcon  = downloadedCount > 0 ? '✅' : (isOffline ? '⚠️' : '📥');
+  const statusMsg   = downloadedCount > 0
+    ? `${downloadedCount} lessons saved offline`
+    : (isOffline ? 'No lessons saved — connect to download' : 'Save lessons for offline learning');
+
+  container.innerHTML = `
+    <div class="offline-card" style="background:var(--card);border:1px solid var(--border);border-radius:16px;padding:16px;margin-bottom:16px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+      <div style="font-size:2rem;flex-shrink:0">${statusIcon}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:700;font-size:0.9rem;color:var(--text);margin-bottom:2px">Offline Mode</div>
+        <div id="offline-dl-status" style="font-size:0.78rem;color:${statusColor};font-weight:600">${statusMsg}</div>
+      </div>
+      ${!isOffline ? `
+        <button id="btn-download-all" onclick="downloadAllLessonsOffline()"
+          style="background:rgba(255,90,54,0.1);color:var(--primary);border:1px solid rgba(255,90,54,0.3);border-radius:10px;padding:7px 12px;font-size:0.78rem;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.2s">
+          📥 Download All
+        </button>` : ''}
+    </div>`;
+}
+
+
 
 function renderXpChart(weeklyXp) {
     const ctx = document.getElementById('weeklyXpChart').getContext('2d');

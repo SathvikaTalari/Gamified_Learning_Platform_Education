@@ -88,19 +88,22 @@ async function _fetchTranslation(text, langCode) {
   const cacheKey = `${text}||${langCode}`;
   if (_cache.has(cacheKey)) return _cache.get(cacheKey);
 
-  const langpair = LANG_PAIRS[langCode];
-  if (!langpair) return text;
-
   try {
-    const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${langpair}`;
-    const res = await fetch(url);
+    const token = localStorage.getItem('vq_token');
+    const res = await fetch('/api/translate', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token ? `Bearer ${token}` : ''
+      },
+      body: JSON.stringify({
+        texts: [trimmed],
+        targetLanguage: langCode
+      })
+    });
     if (!res.ok) throw new Error('API error');
     const json = await res.json();
-    const translated = json?.responseData?.translatedText || text;
-    // MyMemory sometimes returns error strings — detect them
-    if (translated.toLowerCase().includes('mymemory warning') || translated.toLowerCase().includes('quota')) {
-      return text; // fallback to original
-    }
+    const translated = json?.translations?.[0] || text;
     _cache.set(cacheKey, translated);
     return translated;
   } catch (e) {
@@ -150,22 +153,47 @@ async function translatePage(lang) {
         el.dataset.i18nOriginal = el.textContent.trim();
       }
       const original = el.dataset.i18nOriginal;
-      if (_isTranslatable(original)) {
+      
+      // Check cache first
+      const cacheKey = `${original}||${lang}`;
+      if (_cache.has(cacheKey)) {
+        el.textContent = _cache.get(cacheKey);
+      } else if (LOCAL_DICTIONARY[original.trim()] && LOCAL_DICTIONARY[original.trim()][lang]) {
+        el.textContent = LOCAL_DICTIONARY[original.trim()][lang];
+      } else if (_isTranslatable(original)) {
         toTranslate.push({ el, text: original });
       }
     });
 
-    // Batch translate in parallel (max 10 at a time to respect rate limits)
-    const BATCH_SIZE = 10;
-    for (let i = 0; i < toTranslate.length; i += BATCH_SIZE) {
-      const batch = toTranslate.slice(i, i + BATCH_SIZE);
-      const results = await Promise.all(
-        batch.map(item => _fetchTranslation(item.text, lang))
-      );
-      results.forEach((translated, idx) => {
-        const { el } = batch[idx];
-        el.textContent = translated;
+    if (toTranslate.length > 0) {
+      const textsToTranslate = toTranslate.map(item => item.text.trim());
+      const token = localStorage.getItem('vq_token');
+      
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': token ? `Bearer ${token}` : ''
+        },
+        body: JSON.stringify({
+          texts: textsToTranslate,
+          targetLanguage: lang
+        })
       });
+
+      if (res.ok) {
+        const json = await res.json();
+        const translations = json.translations || [];
+        toTranslate.forEach((item, idx) => {
+          const translated = translations[idx] || item.text;
+          item.el.textContent = translated;
+          // Store in cache
+          const cacheKey = `${item.text}||${lang}`;
+          _cache.set(cacheKey, translated);
+        });
+      } else {
+        throw new Error('Translation API returned non-OK status');
+      }
     }
 
     _lastTranslatedLang = lang;
@@ -176,6 +204,7 @@ async function translatePage(lang) {
     _hideTranslatingIndicator();
   }
 }
+
 
 // ─────────────────────────────────────────────────────────────
 // Translate a single element's textContent (for dynamic content)

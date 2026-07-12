@@ -2,22 +2,50 @@
 <html lang="en" id="html-root">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#FF6B35">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta http-equiv="x-ua-compatible" content="IE=edge">
 <meta name="description" content="VidyaQuest — Gamified STEM education for rural students. Works offline.">
 <title>VidyaQuest — STEM for Rural India</title>
 <link rel="manifest" href="/manifest.json">
+
+<!-- DNS prefetch for CDNs so connections are ready faster on 2G/3G -->
+<link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
+<link rel="dns-prefetch" href="https://fonts.googleapis.com">
+<link rel="dns-prefetch" href="https://fonts.gstatic.com">
+<link rel="dns-prefetch" href="https://api.groq.com">
+
+<!-- Preconnect to font origins (saves 200-600ms on slow connections) -->
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<!-- Preload critical CSS and JS so they start downloading immediately -->
+<link rel="preload" href="/css/main.css" as="style">
+<link rel="preload" href="/js/app.js" as="script">
+
+<!-- Main CSS — loaded synchronously (critical for first paint) -->
+<link rel="stylesheet" href="css/main.css">
+
+<!-- KaTeX CSS — async so it doesn't block page render -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" media="print" onload="this.media='all'">
+<noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css"></noscript>
+
+<!-- Google Fonts — non-blocking load (print trick) so text shows immediately with fallback font -->
 <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;700;800&family=Hind:wght@400;500;600&display=swap"></noscript>
-<link rel="stylesheet" href="css/main.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+
+<!-- Chart.js — deferred (only needed for dashboard charts, not critical path) -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+
+<!-- KaTeX — synchronous (needed for Scan & Solve math rendering immediately) -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js"></script>
 </head>
+
 <body>
 <!-- CONNECTIVITY STATUS BANNER -->
 <div id="connectivity-banner" class="connectivity-banner connectivity-hidden" role="alert" aria-live="polite">
@@ -33,6 +61,7 @@
       <select onchange="switchLanguage(this.value)" class="auth-lang-select" title="Choose Language">
         <option value="en">🇬🇧 English</option>
         <option value="hi">🇮🇳 हिंदी (Hindi)</option>
+        <option value="te">🇮🇳 తెలుగు (Telugu)</option>
         <option value="mr">🇮🇳 मराठी (Marathi)</option>
       </select>
     </div>
@@ -218,10 +247,10 @@
           </label>
         </div>
         <select id="lang-switcher" onchange="switchLanguage(this.value)" class="lang-select">
-          <option value="en">EN</option>
-          <option value="hi">हि</option>
-          <option value="mr">म</option>
-          <option value="or">ଓଡ଼</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="hi">🇮🇳 हिंदी</option>
+          <option value="te">🇮🇳 తెలుగు</option>
+          <option value="mr">🇮🇳 मराठी</option>
         </select>
         <button class="theme-toggle-btn" onclick="toggleTheme()" title="Toggle Theme">🌙</button>
         <button class="avatar-btn" onclick="showScreen('profile')">
@@ -585,6 +614,8 @@
       </div>
 
       <div id="screen-home" class="inner-screen active">
+        <!-- Offline Readiness Card — injected by renderOfflineReadinessCard() -->
+        <div id="offline-readiness-card"></div>
         <!-- Main Two-Column Row -->
         <div class="student-dashboard-container">
           <!-- Left Column (Main Content) -->

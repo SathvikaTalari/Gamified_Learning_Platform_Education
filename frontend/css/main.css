@@ -1,3 +1,62 @@
+/* ===== LOW-COST DEVICE & LOW-BANDWIDTH PERFORMANCE OPTIMIZATIONS ===== */
+
+/* System font fallback stack — renders immediately if Google Fonts fails to load (offline/slow)
+   App still looks good with system fonts on low-cost Android devices */
+:root {
+  --font-body: 'Hind', 'Noto Sans', 'Segoe UI', Arial, sans-serif;
+  --font-heading: 'Baloo 2', 'Trebuchet MS', Arial, sans-serif;
+}
+
+/* ── Reduce animations for users who prefer it, and for low-end devices ──
+   Targets: prefers-reduced-motion setting + slow Android devices
+   Effect: disables all transitions/animations → eliminates jank on 1GB RAM phones */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── CSS Containment — tells browser each card is layout-isolated
+   Prevents full-page reflows when card content changes (huge win on low-end devices) ──
+   Applied to the most common repeating card components */
+.lesson-card,
+.subject-card,
+.badge-card,
+.group-card,
+.subject-home-card,
+.leader-row,
+.teacher-stat-card,
+.student-stat-card {
+  contain: content;   /* layout + paint + style isolated per card */
+}
+
+/* ── will-change hints for elements that animate on scroll/hover
+   Pre-promotes them to a GPU layer, preventing layout thrashing ── */
+.bottom-nav,
+.top-nav,
+.scan-solve-overlay {
+  will-change: transform;
+}
+
+/* ── Optimized scrolling on low-end mobile (momentum scrolling + GPU compositing) ── */
+.inner-screen,
+.solution-body,
+.chat-messages,
+.lessons-list,
+.leaderboard-list {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* ── Image loading optimization — all images lazy-loaded by default ── */
+img {
+  loading: lazy;
+  content-visibility: auto;
+}
+
 /* ===== RESET & BASE ===== */
 * {
   margin: 0;

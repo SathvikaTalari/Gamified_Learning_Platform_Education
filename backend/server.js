@@ -1,14 +1,15 @@
 require('dotenv').config();
-const express = require('express');
-const cors = require('cors');
-const path = require('path');
-const Database = require('better-sqlite3');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const http = require('http');
-const https = require('https');
-const fs = require('fs');
-const socketIo = require('socket.io');
+const express    = require('express');
+const cors       = require('cors');
+const path       = require('path');
+const Database   = require('better-sqlite3');
+const bcrypt     = require('bcryptjs');
+const jwt        = require('jsonwebtoken');
+const http       = require('http');
+const https      = require('https');
+const fs         = require('fs');
+const socketIo   = require('socket.io');
+const compression = require('compression');
 
 
 const app = express();
@@ -54,15 +55,55 @@ if (fs.existsSync(sslPaths.key) && fs.existsSync(sslPaths.cert)) {
   console.log('[HTTPS] To enable HTTPS (needed for camera access over LAN), generate certificates and place them in the project root.');
 }
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static(path.join(__dirname, '../frontend')));
+// ── Gzip compression — reduces response size by 60-70% for low-bandwidth devices ──
+app.use(compression({
+  level: 6,        // Good balance between CPU and compression ratio
+  threshold: 1024, // Only compress responses > 1KB
+  filter: (req, res) => {
+    // Don't compress already-compressed formats
+    if (req.headers['x-no-compression']) return false;
+    return compression.filter(req, res);
+  }
+}));
 
-// Serve PhET offline simulation folders statically
-app.use('/labs/biology', express.static(path.join(__dirname, '../Biology Phet Labs')));
-app.use('/labs/chemistry', express.static(path.join(__dirname, '../Chemistry Phet Labs')));
-app.use('/labs/maths', express.static(path.join(__dirname, '../Maths Phet Labs')));
-app.use('/labs/physics', express.static(path.join(__dirname, '../Physics Phet Labs')));
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+// Static file serving with long-lived Cache-Control headers
+// Browser will cache JS/CSS/images for 24h, reducing repeat-visit data usage significantly
+const staticOptions = {
+  maxAge: '1d',      // Cache static assets for 1 day
+  etag: true,        // ETags for conditional requests (304 Not Modified)
+  lastModified: true,
+  setHeaders: (res, filePath) => {
+    // HTML should always revalidate (so app updates are picked up)
+    if (filePath.endsWith('.html')) {
+      res.setHeader('Cache-Control', 'no-cache');
+    }
+    // JS and CSS — cache 1 day
+    else if (filePath.endsWith('.js') || filePath.endsWith('.css')) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    }
+    // Images — cache 7 days
+    else if (/\.(jpg|jpeg|png|gif|svg|webp|ico)$/.test(filePath)) {
+      res.setHeader('Cache-Control', 'public, max-age=604800');
+    }
+  }
+};
+
+app.use(express.static(path.join(__dirname, '../frontend'), staticOptions));
+
+// Serve PhET offline simulation folders statically (long cache - PhET files never change)
+app.use('/labs/biology',   express.static(path.join(__dirname, '../Biology Phet Labs'),   { maxAge: '7d', etag: true }));
+app.use('/labs/chemistry', express.static(path.join(__dirname, '../Chemistry Phet Labs'), { maxAge: '7d', etag: true }));
+app.use('/labs/maths',     express.static(path.join(__dirname, '../Maths Phet Labs'),     { maxAge: '7d', etag: true }));
+app.use('/labs/physics',   express.static(path.join(__dirname, '../Physics Phet Labs'),   { maxAge: '7d', etag: true }));
+
+// API routes should not be cached by the browser
+app.use('/api', (req, res, next) => {
+  res.setHeader('Cache-Control', 'no-store');
+  next();
+});
 
 const db = new Database(path.join(__dirname, '../database/stem_platform.db'));
 
@@ -2050,11 +2091,101 @@ app.delete('/api/teacher/lessons/:id', auth, requireRole('teacher'), (req, res) 
   if (!lesson) return res.status(404).json({ error: 'Lesson not found or not yours' });
   db.prepare('DELETE FROM questions WHERE lesson_id = ?').run(lesson.id);
   db.prepare('DELETE FROM user_progress WHERE lesson_id = ?').run(lesson.id);
-  db.prepare('DELETE FROM lessons WHERE id = ?').run(lesson.id);
   res.json({ success: true });
 });
 
+// ===== LIVE BATCH TRANSLATION API (GEMINI / GROQ FALLBACK) =====
+app.post('/api/translate', auth, async (req, res) => {
+  const { texts, targetLanguage } = req.body;
+  if (!texts || !Array.isArray(texts) || texts.length === 0) {
+    return res.status(400).json({ error: 'texts must be a non-empty array' });
+  }
+
+  const langMap = { en: 'English', hi: 'Hindi', mr: 'Marathi', te: 'Telugu', or: 'Odia' };
+  const langName = langMap[targetLanguage] || targetLanguage;
+
+  if (targetLanguage === 'en') {
+    return res.json({ translations: texts });
+  }
+
+  const prompt = `You are a professional web page translator. Translate the following array of English strings into ${langName}.
+Return the translations as a raw JSON array of strings in the exact same order.
+Do not wrap the output in markdown code blocks, backticks, or write any explanations. Return only the raw JSON.
+
+Input strings:
+${JSON.stringify(texts)}`;
+
+  try {
+    // 1. Try Google Gemini API if GEMINI_API_KEY is available
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY.trim()}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' }
+          })
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (rawText) {
+            const parsed = JSON.parse(rawText.trim());
+            if (Array.isArray(parsed)) {
+              return res.json({ translations: parsed });
+            }
+          }
+        }
+      } catch (geminiError) {
+        console.warn('[Translate API] Gemini translation failed, falling back to Groq:', geminiError.message);
+      }
+    }
+
+    // 2. Fallback to Groq API (using existing Llama key)
+    if (process.env.GROQ_API_KEY) {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.GROQ_API_KEY.trim()}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama-3.1-8b-instant',
+          messages: [
+            { role: 'system', content: 'You are a professional translator API. Output ONLY valid JSON arrays of strings.' },
+            { role: 'user', content: prompt }
+          ],
+          temperature: 0.2
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawText = data.choices?.[0]?.message?.content?.trim();
+        if (rawText) {
+          const cleaned = rawText.replace(/^```json/, '').replace(/```$/, '').trim();
+          const parsed = JSON.parse(cleaned);
+          if (Array.isArray(parsed)) {
+            return res.json({ translations: parsed });
+          }
+        }
+      }
+    }
+
+    // Fallback: return original texts if both APIs fail
+    console.warn('[Translate API] Translation pipeline failed, returning originals');
+    res.json({ translations: texts });
+
+  } catch (error) {
+    console.error('Translation Endpoint Error:', error);
+    res.json({ translations: texts }); // return original texts on crash to keep UI functional
+  }
+});
+
 // ===== AI SMART TUTOR =====
+
 app.post('/api/chat', auth, async (req, res) => {
   const { message, language, lessonTitle, lessonContent } = req.body;
   if (!message) return res.status(400).json({ error: 'Message is required' });
