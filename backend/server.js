@@ -1,7 +1,8 @@
-require('dotenv').config();
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const Database = require('better-sqlite3');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -1858,7 +1859,7 @@ Keep your responses concise, using bullet points and short paragraphs to make it
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           { role: 'system', content: systemInstruction },
           { role: 'user', content: message }
@@ -1893,8 +1894,8 @@ app.post('/api/scan-solve', auth, async (req, res) => {
   const targetLanguage = langMap[language] || 'English';
 
   // Strip data URL prefix if present, keep just base64
-  const base64Data = imageBase64.replace(/^data:image\/[a-z]+;base64,/, '');
-  const mimeMatch = imageBase64.match(/^data:(image\/[a-z]+);base64,/);
+  const base64Data = imageBase64.replace(/^data:image\/[^;]+;base64,/i, '');
+  const mimeMatch = imageBase64.match(/^data:(image\/[^;]+);base64/i);
   const mimeType = mimeMatch ? mimeMatch[1] : 'image/jpeg';
 
   const systemPrompt = `You are VidyaQuest's expert STEM tutor for rural Indian school students (Grades 6–12).
@@ -1947,7 +1948,7 @@ Always divide by 2 when finding the area of a triangle — this is because a tri
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           { role: 'system', content: systemPrompt },
           {
@@ -2023,7 +2024,7 @@ app.post('/api/emotion/analyze', auth, async (req, res) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+        model: 'qwen/qwen3.8-27b',
         messages: [
           {
             role: 'system',
@@ -2247,7 +2248,7 @@ Format the output strictly as a JSON array of objects. Do not write any markdown
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            model: 'llama-3.1-8b-instant',
+            model: 'qwen/qwen3.8-27b',
             messages: [
               { role: 'system', content: 'You are a JSON-only API helper. Do not output anything other than a JSON array.' },
               { role: 'user', content: prompt }

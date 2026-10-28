@@ -1,3 +1,5 @@
 node_modules/
 backend/.env
+.env
+*.env
 tmp_err.html

@@ -2945,7 +2945,7 @@ function renderSTEMContent(text, element) {
   // Match display math: $$...$$ or \[...\]
   const displayRegex = /(\$\$[\s\S]*?\$\$|\\\[[\s\S]*?\\\])/g;
   let processedText = text.replace(displayRegex, (match) => {
-    const placeholder = `___MATH_DISPLAY_PLACEHOLDER_${placeholderCounter}___`;
+    const placeholder = `KATEXDISP${placeholderCounter}ENDK`;
     mathBlocks.push({ placeholder, content: match, display: true });
     placeholderCounter++;
     return placeholder;
@@ -2954,7 +2954,7 @@ function renderSTEMContent(text, element) {
   // Match inline math: $...$ or \(...\)
   const inlineRegex = /(\$[^\$\n]+?\$|\\\([\s\S]*?\\\))/g;
   processedText = processedText.replace(inlineRegex, (match) => {
-    const placeholder = `___MATH_INLINE_PLACEHOLDER_${placeholderCounter}___`;
+    const placeholder = `KATEXINL${placeholderCounter}ENDK`;
     mathBlocks.push({ placeholder, content: match, display: false });
     placeholderCounter++;
     return placeholder;
@@ -2973,7 +2973,7 @@ function renderSTEMContent(text, element) {
 
   // 3. Put math blocks back in the generated HTML
   mathBlocks.forEach(item => {
-    html = html.replace(item.placeholder, item.content);
+    html = html.split(item.placeholder).join(item.content);
   });
 
   // 4. Set innerHTML
