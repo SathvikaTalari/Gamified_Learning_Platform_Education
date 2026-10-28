@@ -12,5 +12,5 @@ const req = http.request({
   res.on('data', d => b += d);
   res.on('end', () => console.log(b));
 });
-req.write(JSON.stringify({username: 'arjun', password: 'demo123'}));
+req.write(JSON.stringify({email: 'arjun@vidyaquest.com', password: 'Demo@123'}));
 req.end();

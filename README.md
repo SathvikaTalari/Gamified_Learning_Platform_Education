@@ -11,7 +11,7 @@ A gamified, offline-capable STEM learning platform for students in Grades 6-12.
 
 1. **Install dependencies**
    ```bash
-   cd stem-rural-platform/backend
+   cd backend
    npm install
    ```
 
@@ -26,8 +26,8 @@ A gamified, offline-capable STEM learning platform for students in Grades 6-12.
 ---
 
 ## 🔑 Demo Login
-- **Username:** `arjun`
-- **Password:** `demo123`
+- **Student:** `arjun@vidyaquest.com` | Password: `Demo@123`
+- **Teacher:** `priya@vidyaquest.com` | Password: `Teach@123`
 
 ---
 
